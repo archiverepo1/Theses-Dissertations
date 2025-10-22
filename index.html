@@ -7,67 +7,90 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- ===== HERO ===== -->
+  <!-- Hero -->
   <header class="hero">
     <canvas id="heroBg"></canvas>
     <div class="hero-text">
-      <h1 id="homeBtn">National Theses & Dissertations Portal (South Africa)</h1>
+      <h1>National Theses & Dissertations Portal (South Africa)</h1>
       <p>Discover theses & dissertations harvested live from South African DSpace repositories (OAI-PMH).</p>
     </div>
   </header>
 
-  <!-- ===== FILTERS ===== -->
+  <!-- Controls -->
   <section class="controls">
     <div class="filters">
-      <!-- Institution (multi-select) -->
-      <label class="label-inline">Institution:</label>
-      <div class="multiselect" id="instDropdown">
-        <button id="instToggle" class="multi-btn" aria-haspopup="listbox" aria-expanded="false">
-          All
-        </button>
-        <div id="instList" class="multi-panel" role="listbox"></div>
-      </div>
+      <!-- Institution multiselect trigger -->
+      <label>Institution:
+        <button id="instTrigger" class="dropdown-trigger">All</button>
+      </label>
 
       <!-- Type -->
-      <label class="label-inline">Type:</label>
-      <select id="typeFilter">
-        <option value="">All</option>
-        <option value="thesis">Thesis</option>
-        <option value="dissertation">Dissertation</option>
-      </select>
+      <label>Type:
+        <select id="typeFilter">
+          <option value="">All</option>
+          <option value="thesis">Thesis</option>
+          <option value="dissertation">Dissertation</option>
+        </select>
+      </label>
 
       <!-- Page size -->
-      <label class="label-inline">Page Size:</label>
-      <select id="pageSizeSelect">
-        <option value="50">50</option>
-        <option value="100" selected>100</option>
-      </select>
+      <label>Page Size:
+        <select id="pageSizeSelect">
+          <option value="50">50</option>
+          <option value="100" selected>100</option>
+        </select>
+      </label>
 
-      <!-- Unified search (title/authors/abstract/institution/year) -->
-      <label class="label-inline">Search:</label>
-      <input id="searchInput" type="text"
-        placeholder="Search title, authors, abstract, institution, or year (e.g. 2023)" />
+      <!-- Unified search (title/authors/abstract/subjects/year/institution) -->
+      <label>Search:
+        <input id="searchInput" type="text"
+               placeholder="Search title, authors, abstract, subjects, year, institution… (press Enter)" />
+      </label>
+      <span class="note">Live OAI-PMH harvest • DSpace</span>
+    </div>
+
+    <!-- Institution dropdown panel -->
+    <div id="instPanel" class="inst-panel hidden" role="dialog" aria-label="Choose institutions">
+      <div class="inst-panel-head">
+        <strong>Select institutions</strong>
+        <button id="instClose" class="xbtn" aria-label="Close">✕</button>
+      </div>
+      <div class="inst-panel-body" id="instChecklist">
+        <!-- filled by JS -->
+      </div>
+      <div class="inst-panel-foot">
+        <button id="instSelectAll" class="ghost">Select all</button>
+        <button id="instApply" class="primary">Apply</button>
+      </div>
     </div>
   </section>
 
-  <!-- ===== UNIVERSITY CARDS (HOME) ===== -->
+  <!-- Cross-repo hint (shown when a search matches elsewhere) -->
+  <div id="hintBar" class="hint hidden"></div>
+
+  <!-- Institution grid (logo cards). Clicking a card filters to that university. -->
   <section id="instGrid" class="inst-grid">
-    <!-- Filled by script with logos.json + known endpoints -->
+    <!-- filled by JS -->
   </section>
 
-  <!-- ===== RESULTS ===== -->
-  <main id="results" class="results"></main>
+  <!-- Results -->
+  <main id="results" class="results">
+    <div class="loading" id="loadingSpinner">
+      <div class="spinner"></div>
+      <div>Harvesting DSpace repositories…</div>
+    </div>
+  </main>
 
-  <!-- ===== PAGINATION ===== -->
+  <!-- Pagination -->
   <div id="pagination" class="pagination hidden">
     <button id="prevPage">⟨ Prev</button>
     <span id="pageInfo">Page 1 of 1</span>
     <button id="nextPage">Next ⟩</button>
   </div>
 
-  <!-- ===== FOOTER ===== -->
+  <!-- Footer -->
   <footer class="footer">
-    <p>© 2025 Theses-Dissertations • DSpace OAI-PMH Harvester • Served via Cloudflare Worker</p>
+    <p>© 2025 InquiryBase • DSpace OAI-PMH Harvester • Served via Cloudflare Worker</p>
     <p>Developed by Vuyo Ngayeka</p>
   </footer>
 
