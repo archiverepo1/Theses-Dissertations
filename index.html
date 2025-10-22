@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>National ETD Portal (SA)</title>
+  <title>National Theses & Dissertations Portal (South Africa)</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,9 +11,8 @@
   <header class="hero">
     <canvas id="heroBg"></canvas>
     <div class="hero-text">
-      <h1 id="homeBtn">Theses-Dissertations
-</h1>
-      <p>Discover theses & dissertations harvested live from DSpace repositories (OAI-PMH).</p>
+      <h1 id="homeBtn">National Theses & Dissertations Portal (South Africa)</h1>
+      <p>Discover and explore postgraduate research from South African universities — harvested live via DSpace OAI-PMH.</p>
     </div>
   </header>
 
@@ -23,6 +22,16 @@
       <label>Institution:
         <select id="institutionFilter"><option value="">All</option></select>
       </label>
+      <label>Type:
+        <select id="typeFilter">
+          <option value="">All</option>
+          <option value="thesis">Thesis</option>
+          <option value="dissertation">Dissertation</option>
+        </select>
+      </label>
+      <label>Year:
+        <input id="yearFilter" type="text" placeholder="e.g. 2023" />
+      </label>
       <label>Page Size:
         <select id="pageSizeSelect">
           <option value="50">50</option>
@@ -30,21 +39,9 @@
         </select>
       </label>
       <label>Search:
-        <input id="searchInput" type="text" placeholder="Search title, authors, abstract, subjects, institution…" />
+        <input id="searchInput" type="text" placeholder="Search title, authors, abstract, subjects, advisor…" />
       </label>
-      <span class="note">Live OAI-PMH harvest • DSpace</span>
     </div>
-
-    <aside id="overview" class="overview hidden">
-      <h3>📊 Data Overview</h3>
-      <p><strong>Total:</strong> <span id="countTotal">0</span> records</p>
-      <p><strong>Institutions:</strong> <span id="countInst">0</span></p>
-      <h4>Top Subjects</h4>
-      <ul id="topSubjects"></ul>
-      <h4>Top Degree Types</h4>
-      <ul id="topTypes"></ul>
-      <p class="stamp" id="stamp"></p>
-    </aside>
   </section>
 
   <!-- ===== RESULTS ===== -->
@@ -64,7 +61,7 @@
 
   <!-- ===== FOOTER ===== -->
   <footer class="footer">
-    <p>© 2025 InquiryBase • DSpace OAI-PMH Harvester • Served via Cloudflare Worker</p>
+    <p>© 2025 National ETD Portal • Built with DSpace OAI-PMH • Powered by Cloudflare Worker</p>
     <p>Developed by Vuyo Ngayeka</p>
   </footer>
 
