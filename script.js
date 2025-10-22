@@ -1,393 +1,417 @@
 const PROXY = "https://inquirybase.archiverepo1.workers.dev/?url=";
-const LOGOS_URL = "logos.json";
 
-// South African DSpace OAI-PMH endpoints (oai_dc)
+/** South African DSpace OAI endpoints (server endpoint preferred; fallback to /oai/request) */
 const DSPACE_ENDPOINTS = [
-  { name: "University of the Free State (UFS)", url: "https://scholar.ufs.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of Cape Town (UCT)", url: "https://open.uct.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "Stellenbosch University (SUNScholar)", url: "https://scholar.sun.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of Pretoria (UPSpace)", url: "https://repository.up.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "Wits (WIReDSpace)", url: "https://wiredspace.wits.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "North-West University (NWU)", url: "https://repository.nwu.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of KwaZulu-Natal (UKZN)", url: "https://researchspace.ukzn.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of Johannesburg (UJ)", url: "https://ujcontent.uj.ac.za/vital/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of the Western Cape (UWC)", url: "https://etd.uwc.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of South Africa (UNISA)", url: "https://uir.unisa.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "Central University of Technology (CUT)", url: "https://cutscholar.cut.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "Rhodes University (RU)", url: "https://vital.seals.ac.za/vital/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" }
+  { name: "University of Cape Town (UCT)",           primary: "https://open.uct.ac.za/oai/request",                        fallback: null, country: "South Africa" },
+  { name: "Stellenbosch University (SUNScholar)",    primary: "https://scholar.sun.ac.za/server/oai/request",             fallback: "https://scholar.sun.ac.za/oai/request", country: "South Africa" },
+  { name: "University of Pretoria (UPSpace)",        primary: "https://repository.up.ac.za/server/oai/request",           fallback: "https://repository.up.ac.za/oai/request", country: "South Africa" },
+  { name: "Wits (WIReDSpace)",                       primary: "https://wiredspace.wits.ac.za/server/oai/request",         fallback: "https://wiredspace.wits.ac.za/oai/request", country: "South Africa" },
+  { name: "North-West University (NWU)",             primary: "https://repository.nwu.ac.za/server/oai/request",          fallback: "https://repository.nwu.ac.za/oai/request", country: "South Africa" },
+  { name: "University of KwaZulu-Natal (UKZN)",      primary: "https://researchspace.ukzn.ac.za/server/oai/request",      fallback: "https://researchspace.ukzn.ac.za/oai/request", country: "South Africa" },
+  { name: "University of the Free State (UFS)",      primary: "https://scholar.ufs.ac.za/server/oai/request",             fallback: "https://scholar.ufs.ac.za/oai/request", country: "South Africa" },
+  { name: "University of the Western Cape (UWC)",    primary: "https://etd.uwc.ac.za/server/oai/request",                 fallback: "https://etd.uwc.ac.za/oai/request", country: "South Africa" },
+  { name: "University of Johannesburg (UJ)",         primary: "https://ujcontent.uj.ac.za/vital/oai/request",             fallback: null, country: "South Africa" },
+  { name: "Central University of Technology (CUT)",  primary: "https://cutscholar.cut.ac.za/server/oai/request",          fallback: "https://cutscholar.cut.ac.za/oai/request", country: "South Africa" },
+  { name: "Rhodes University (RU / SEALS Vital)",    primary: "https://vital.seals.ac.za/vital/oai/request",              fallback: null, country: "South Africa" },
 ];
 
 const PAGE_SIZE_DEFAULT = 100;
 let PAGE_SIZE = PAGE_SIZE_DEFAULT;
 
-// UI State
-let CURRENT_MODE = "cards"; // "cards" | "list"
-let CURRENT_INSTITUTION = ""; // name when in list mode
 let SEARCH_TEXT = "";
+let YEAR_FILTER = "";      // extracted from query if 4-digit present
+let TYPE_FILTER = "";      // 'thesis' | 'dissertation' | ''
 let CURRENT_PAGE = 1;
 
-// Data caches
-let LOGO_MAP = new Map(); // name -> logoURL
-const INST_CACHE = new Map(); // name -> { items:[], nextToken:null, busy:false }
+const SELECTED_INSTITUTIONS = new Set(); // multi-select state
+const INST_CACHE = new Map();            // name -> items[]
+let INSTITUTIONS = [];                   // all known names
 
-// Helpers
+// UI nodes
+const resultsMount = () => document.getElementById("results");
+const instGrid = () => document.getElementById("instGrid");
+
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
-function el(id) { return document.getElementById(id); }
+/* ---------------------- Utilities ---------------------- */
 function pick(node, tag) {
   return Array.from(node.getElementsByTagNameNS("*", tag)).map(n => (n.textContent || "").trim());
 }
-function pickTags(node, tags) {
-  let out = [];
-  tags.forEach(t => { out = out.concat(pick(node, t)); });
-  return out;
+
+function stringIncludes(hay, needle) {
+  return hay.toLowerCase().includes(needle.toLowerCase());
 }
+
 function bestLink(identifiers = []) {
   const http = identifiers.find(i => /^https?:\/\//i.test(i));
   if (http) return http;
-  const handle = identifiers.find(i => /hdl\.handle\.net/i.test(i));
-  if (handle) return handle.startsWith("http") ? handle : `https://${handle}`;
+  const handle = identifiers.find(i => i.includes("hdl.handle.net"));
+  if (handle) return "https://" + handle.replace(/^https?:\/\//, "");
   const doi = identifiers.find(i => /^10\./.test(i));
-  return doi ? `https://doi.org/${doi}` : "";
+  if (doi) return `https://doi.org/${doi}`;
+  return "";
 }
-function isThesisLike(types = [], desc = "") {
-  const hay = (types.join(" ") + " " + desc).toLowerCase();
-  return /thesis|dissertation|doctoral|masters|m\.sc|m\s?thesis|dphil|phd/.test(hay);
+
+function normalizeType(types = []) {
+  const s = (types.join(" ") || "").toLowerCase();
+  if (s.includes("dissertation")) return "dissertation";
+  if (s.includes("thesis")) return "thesis";
+  return "";
 }
-function normalizeYear(dates = []) {
-  for (const d of dates) {
-    const m = d && d.match(/\b(19|20)\d{2}\b/);
+
+function advisorList(contribs = []) {
+  // try to keep only entries that hint advisor/supervisor
+  return contribs.filter(c => /advisor|supervisor/i.test(c));
+}
+
+function extractYear(dates = [], description = "") {
+  // prefer dc.date.issued / first dc:date 4-digit
+  const all = [...dates, description];
+  for (const v of all) {
+    const m = (v || "").match(/\b(19|20)\d{2}\b/);
     if (m) return m[0];
   }
   return "";
 }
-function typeBucket(types = []) {
-  const t = (types.join(" ") || "").toLowerCase();
-  if (/dissertation|doctoral|phd|dphil/.test(t)) return "dissertation";
-  if (/thesis|masters|m\.sc|m\s?thesis/.test(t)) return "thesis";
-  return "";
+
+/* ---------------------- Fetchers ---------------------- */
+async function fetchOAIListRecords(baseUrl, metadataPrefix = "oai_dc", resumptionToken = "") {
+  const url = resumptionToken
+    ? `${baseUrl}?verb=ListRecords&resumptionToken=${encodeURIComponent(resumptionToken)}`
+    : `${baseUrl}?verb=ListRecords&metadataPrefix=${metadataPrefix}`;
+
+  const res = await fetch(PROXY + encodeURIComponent(url));
+  if (!res.ok) throw new Error(`OAI error ${res.status}`);
+  const text = await res.text();
+  return new DOMParser().parseFromString(text, "text/xml");
 }
 
-// =====================
-// University Cards View
-// =====================
+async function harvestInstitution(inst, maxPages = 8) {
+  // avoid duplicate harvests
+  if (INST_CACHE.has(inst.name) && INST_CACHE.get(inst.name).length) return;
+
+  const base = inst.primary || inst.fallback;
+  let currentBase = base;
+  let token = "";
+  let page = 0;
+  const out = [];
+
+  async function pageOnce() {
+    const xml = await fetchOAIListRecords(currentBase, "oai_dc", token);
+    const recs = Array.from(xml.getElementsByTagNameNS("*", "record"));
+
+    recs.forEach(r => {
+      const md = r.getElementsByTagNameNS("*", "metadata")[0];
+      if (!md) return;
+      const titles   = pick(md, "title");
+      const creators = pick(md, "creator");
+      const descs    = pick(md, "description");
+      const subjects = pick(md, "subject");
+      const types    = pick(md, "type");
+      const dates    = pick(md, "date");
+      const ids      = pick(md, "identifier");
+      const contribs = pick(md, "contributor");
+
+      // include only thesis-like
+      const combined = (types.join(" ") + " " + descs.join(" ")).toLowerCase();
+      if (!/thesis|dissertation/.test(combined)) return;
+
+      const typeNorm = normalizeType(types);
+      out.push({
+        title: titles[0] || "(Untitled)",
+        creators,
+        description: descs[0] || "",
+        subjects,
+        advisors: advisorList(contribs),
+        types,
+        typeNorm,                                  // normalized thesis/dissertation
+        date: extractYear(dates, descs.join(" ")),
+        link: bestLink(ids),
+        institution: inst.name,
+        country: inst.country
+      });
+    });
+
+    // next token
+    const tNode = xml.getElementsByTagNameNS("*", "resumptionToken")[0];
+    token = tNode ? (tNode.textContent || "").trim() : "";
+  }
+
+  while (page < maxPages) {
+    page++;
+    try {
+      await pageOnce();
+      if (!token) break;
+      // polite delay
+      await delay(250);
+    } catch (e) {
+      // if primary fails and fallback exists, try once from page 1 on fallback
+      if (currentBase === inst.primary && inst.fallback) {
+        currentBase = inst.fallback;
+        token = "";
+        page = 0;
+        continue;
+      }
+      console.warn(`Harvest failed for ${inst.name}:`, e.message);
+      break;
+    }
+  }
+
+  INST_CACHE.set(inst.name, out);
+}
+
+/* ---------------------- UI: Inst cards + logos ---------------------- */
 async function loadLogos() {
   try {
-    const logos = await fetch(LOGOS_URL).then(r => r.json());
-    LOGO_MAP = new Map(logos.map(x => [x.name, x.logo]));
-  } catch (e) {
-    console.warn("logos.json load failed:", e);
-    LOGO_MAP = new Map();
+    const res = await fetch("logos.json");
+    if (!res.ok) throw new Error("logos.json not found");
+    return await res.json();
+  } catch {
+    return []; // continue gracefully without logos
   }
 }
 
-function renderUniversityCards() {
-  CURRENT_MODE = "cards";
-  CURRENT_INSTITUTION = "";
-  el("pagination")?.classList.add("hidden");
-
-  // Reset/disable institution/type/year controls while in cards mode
-  el("institutionFilter").innerHTML = `<option value="">All</option>`;
-  el("typeFilter").value = "";
-  el("yearFilter").value = "";
-  el("searchInput").value = "";
-  SEARCH_TEXT = "";
-  CURRENT_PAGE = 1;
-
-  // Show Back button only in list mode; ensure hidden now
-  ensureBackButton(false);
-
-  const mount = el("results");
-  mount.innerHTML = "";
-
-  DSPACE_ENDPOINTS.forEach(({ name }) => {
+function renderInstCards(logoMap) {
+  const grid = instGrid();
+  grid.innerHTML = "";
+  INSTITUTIONS.forEach(name => {
+    const logo = logoMap.find(l => l.name === name);
     const card = document.createElement("div");
-    card.className = "card";
-
-    const logoUrl = LOGO_MAP.get(name) || "";
-    const logoImg = logoUrl ? `<img class="logo" src="${logoUrl}" alt="${name} logo" onerror="this.style.display='none'">` : "";
+    card.className = "inst-card";
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-label", `View records for ${name}`);
 
     card.innerHTML = `
-      ${logoImg}
-      <h3>${name}</h3>
-      <p>Explore theses and dissertations from this repository.</p>
-      <p><a href="#" data-inst="${name}">View Records ↗</a></p>
+      <img src="${logo?.logo || ""}" alt="${name} logo" onerror="this.style.display='none'">
+      <div class="name">${name}</div>
     `;
-    card.querySelector("a").addEventListener("click", (e) => {
-      e.preventDefault();
-      openInstitution(name);
+
+    card.addEventListener("click", async () => {
+      // select only this institution
+      SELECTED_INSTITUTIONS.clear();
+      SELECTED_INSTITUTIONS.add(name);
+      updateInstButtonLabel();
+      await ensureSelectedLoaded();
+      // show results and scroll
+      render();
+      window.scrollTo({ top: grid.offsetTop - 10, behavior: "smooth" });
     });
-    mount.appendChild(card);
+
+    grid.appendChild(card);
   });
 }
 
-// ======================
-// Institution List View
-// ======================
-async function openInstitution(instName) {
-  CURRENT_MODE = "list";
-  CURRENT_INSTITUTION = instName;
-  CURRENT_PAGE = 1;
-
-  // Set institution dropdown to current and disable it (to reinforce focused view)
-  const instSel = el("institutionFilter");
-  instSel.innerHTML = `<option value="${instName}" selected>${instName}</option>`;
-  instSel.disabled = true;
-
-  ensureBackButton(true);
-
-  // Ensure cache entry
-  if (!INST_CACHE.has(instName)) {
-    INST_CACHE.set(instName, { items: [], nextToken: null, busy: false });
+/* ---------------------- Filters (multi-select) ---------------------- */
+function updateInstButtonLabel() {
+  const btn = document.getElementById("instToggle");
+  if (!SELECTED_INSTITUTIONS.size || SELECTED_INSTITUTIONS.size === INSTITUTIONS.length) {
+    btn.textContent = "All";
+  } else if (SELECTED_INSTITUTIONS.size === 1) {
+    btn.textContent = [...SELECTED_INSTITUTIONS][0];
+  } else {
+    btn.textContent = `${SELECTED_INSTITUTIONS.size} selected`;
   }
-
-  // If nothing fetched yet, fetch initial batch (up to 5 OAI pages)
-  const entry = INST_CACHE.get(instName);
-  if (!entry.items.length && !entry.busy) {
-    await fetchInstitutionPages(instName, 5);
-  }
-
-  // Populate type/year/search events
-  bindListFilters();
-
-  // Render results
-  renderList();
 }
 
-function ensureBackButton(show) {
-  let btn = el("backBtn");
-  if (!btn) {
-    btn = document.createElement("button");
-    btn.id = "backBtn";
-    btn.textContent = "← Back to Universities";
-    btn.style.marginLeft = "8px";
-    btn.style.background = "#6b7280";
-    btn.style.color = "#fff";
-    btn.style.border = "none";
-    btn.style.borderRadius = "5px";
-    btn.style.padding = "6px 10px";
-    btn.style.cursor = "pointer";
-    btn.addEventListener("click", () => {
-      // enable institution dropdown again
-      el("institutionFilter").disabled = false;
-      renderUniversityCards();
-    });
-    // attach to filters bar
-    const filtersBar = document.querySelector(".controls .filters");
-    if (filtersBar) filtersBar.appendChild(btn);
-  }
-  btn.style.display = show ? "inline-block" : "none";
-}
+function buildInstitutionDropdown() {
+  const list = document.getElementById("instList");
+  list.innerHTML = "";
 
-async function fetchInstitutionPages(instName, maxPages = 5) {
-  const inst = DSPACE_ENDPOINTS.find(e => e.name === instName);
-  if (!inst) return;
-
-  const entry = INST_CACHE.get(instName);
-  if (!entry || entry.busy) return;
-
-  entry.busy = true;
-
-  let url = entry.nextToken
-    ? `${inst.url.split("?")[0]}?verb=ListRecords&resumptionToken=${encodeURIComponent(entry.nextToken)}`
-    : inst.url;
-
-  let page = 0;
-
-  try {
-    while (url && page < maxPages) {
-      page++;
-      const res = await fetch(PROXY + encodeURIComponent(url));
-      const text = await res.text();
-      const xml = new DOMParser().parseFromString(text, "text/xml");
-
-      const records = Array.from(xml.getElementsByTagNameNS("*", "record"));
-      const tokenNode = xml.getElementsByTagNameNS("*", "resumptionToken")[0];
-      const nextToken = tokenNode ? tokenNode.textContent.trim() : null;
-
-      records.forEach(r => {
-        const md = r.getElementsByTagNameNS("*", "metadata")[0];
-        if (!md) return;
-
-        // core DC fields
-        const titles = pick(md, "title");
-        const creators = pick(md, "creator");
-        // Many repos use dc:description AND dc:abstract (qualified)
-        const descriptions = pickTags(md, ["description", "abstract"]);
-        const subjects = pick(md, "subject");
-        const types = pick(md, "type");
-        const dates = pick(md, "date");
-        const identifiers = pick(md, "identifier");
-
-        // Advisors/supervisors (some expose as qualified DC)
-        const advisors = pickTags(md, ["contributor.advisor", "advisor", "contributor"]);
-        const supervisors = pickTags(md, ["contributor.supervisor", "supervisor", "contributor"]);
-
-        const description = descriptions[0] || "";
-        if (!isThesisLike(types, description)) return;
-
-        const item = {
-          title: titles[0] || "(Untitled)",
-          creators,
-          description,
-          subjects,
-          advisors,
-          supervisors,
-          types,
-          year: normalizeYear(dates),
-          link: bestLink(identifiers),
-          institution: instName
-        };
-
-        entry.items.push(item);
-      });
-
-      entry.nextToken = nextToken || null;
-      url = nextToken
-        ? `${inst.url.split("?")[0]}?verb=ListRecords&resumptionToken=${encodeURIComponent(nextToken)}`
-        : null;
-
-      // be polite to repos
-      await delay(200);
+  // Select all
+  const rowAll = document.createElement("div");
+  rowAll.className = "row";
+  rowAll.innerHTML = `<input type="checkbox" id="inst_all" ${SELECTED_INSTITUTIONS.size ? "" : "checked"}> <label for="inst_all"><strong>Select all</strong></label>`;
+  rowAll.addEventListener("click", (e) => {
+    const input = rowAll.querySelector("input");
+    const willCheck = !input.checked;
+    input.checked = willCheck;
+    SELECTED_INSTITUTIONS.clear();
+    if (!willCheck) {
+      // none selected
+    } else {
+      // all selected => clear set (means 'All')
     }
-  } catch (e) {
-    console.warn(`Fetch failed for ${instName}:`, e);
-  } finally {
-    entry.busy = false;
-  }
+    updateInstButtonLabel();
+    render();
+    e.stopPropagation();
+  });
+  list.appendChild(rowAll);
+
+  // Institutions
+  INSTITUTIONS.forEach(name => {
+    const id = `inst_${btoa(name).replace(/=+/g,"")}`;
+    const row = document.createElement("div");
+    row.className = "row";
+    const checked = SELECTED_INSTITUTIONS.has(name) ? "checked" : "";
+    row.innerHTML = `<input type="checkbox" id="${id}" ${checked}> <label for="${id}">${name}</label>`;
+    row.addEventListener("click", (e) => {
+      const input = row.querySelector("input");
+      input.checked = !input.checked;
+      if (input.checked) SELECTED_INSTITUTIONS.add(name);
+      else SELECTED_INSTITUTIONS.delete(name);
+      updateInstButtonLabel();
+      render();
+      e.stopPropagation();
+    });
+    list.appendChild(row);
+  });
+
+  // Toggle handler
+  const toggle = document.getElementById("instToggle");
+  const panel = document.getElementById("instList");
+  toggle.addEventListener("click", (e) => {
+    const isOpen = panel.classList.contains("open");
+    panel.classList.toggle("open", !isOpen);
+    toggle.setAttribute("aria-expanded", String(!isOpen));
+    e.stopPropagation();
+  });
+  document.addEventListener("click", () => panel.classList.remove("open"));
 }
 
-function bindListFilters() {
-  const pageSel = el("pageSizeSelect");
+/* ---------------------- Search & filters ---------------------- */
+function parseSearchQuery(raw) {
+  const s = (raw || "").trim();
+  if (!s) { SEARCH_TEXT = ""; YEAR_FILTER = ""; return; }
+
+  // Simple heuristic: grab the first standalone 4-digit year.
+  const m = s.match(/\b(19|20)\d{2}\b/);
+  YEAR_FILTER = m ? m[0] : "";
+  SEARCH_TEXT = s;
+}
+
+function buildFilters() {
+  // Type
+  const typeSel = document.getElementById("typeFilter");
+  TYPE_FILTER = typeSel.value || "";
+  typeSel.addEventListener("change", () => {
+    TYPE_FILTER = typeSel.value || "";
+    CURRENT_PAGE = 1; render();
+  });
+
+  // Page size
+  const pageSel = document.getElementById("pageSizeSelect");
   PAGE_SIZE = parseInt(pageSel.value, 10) || PAGE_SIZE_DEFAULT;
-  pageSel.onchange = () => {
+  pageSel.addEventListener("change", () => {
     PAGE_SIZE = parseInt(pageSel.value, 10) || PAGE_SIZE_DEFAULT;
-    CURRENT_PAGE = 1; renderList();
-  };
+    CURRENT_PAGE = 1; render();
+  });
 
-  const typeSel = el("typeFilter");
-  typeSel.onchange = () => { CURRENT_PAGE = 1; renderList(); };
+  // Unified search
+  const searchBox = document.getElementById("searchInput");
+  parseSearchQuery(searchBox.value);
+  searchBox.addEventListener("input", e => { parseSearchQuery(e.target.value); CURRENT_PAGE = 1; render(); });
+  searchBox.addEventListener("keypress", e => { if (e.key === "Enter") render(); });
 
-  const yearSel = el("yearFilter");
-  yearSel.oninput = () => { CURRENT_PAGE = 1; renderList(); };
-
-  const searchBox = el("searchInput");
-  searchBox.oninput = (e) => { SEARCH_TEXT = e.target.value.toLowerCase(); CURRENT_PAGE = 1; renderList(); };
-  searchBox.onkeypress = (e) => { if (e.key === "Enter") renderList(); };
-
-  // Prev/Next paging
-  el("prevPage").onclick = () => { if (CURRENT_PAGE > 1) { CURRENT_PAGE--; renderList(); } };
-  el("nextPage").onclick = () => { CURRENT_PAGE++; renderList(); };
+  // Institution multi-select control
+  buildInstitutionDropdown();
+  updateInstButtonLabel();
 }
 
-function currentFilteredItems() {
-  const entry = INST_CACHE.get(CURRENT_INSTITUTION) || { items: [] };
-  const items = entry.items;
+/* ---------------------- Render ---------------------- */
+function filteredItems() {
+  // collect pooled items based on selected institutions
+  let pool = [];
+  if (!SELECTED_INSTITUTIONS.size) {
+    // 'All': merge all caches
+    INST_CACHE.forEach(items => pool.push(...items));
+  } else {
+    SELECTED_INSTITUTIONS.forEach(name => {
+      const items = INST_CACHE.get(name) || [];
+      pool.push(...items);
+    });
+  }
 
-  const q = (SEARCH_TEXT || "").trim();
-  const y = (el("yearFilter")?.value || "").trim();
-  const typeVal = (el("typeFilter")?.value || "").trim(); // "thesis" | "dissertation" | ""
+  // apply filters
+  const txt = (SEARCH_TEXT || "").toLowerCase();
+  const yr = YEAR_FILTER;
+  const type = TYPE_FILTER;
 
-  return items.filter(it => {
-    // search across title, description/abstract, authors, subjects, advisors/supervisors
-    const t = (it.title || "").toLowerCase();
-    const d = (it.description || "").toLowerCase();
-    const a = (it.creators || []).join(" ").toLowerCase();
-    const s = (it.subjects || []).join(" ").toLowerCase();
+  return pool.filter(it => {
+    // type
+    if (type && it.typeNorm && it.typeNorm !== type) return false;
+    // year
+    if (yr && it.date && it.date.substring(0,4) !== yr) return false;
+
+    if (!txt) return true;
+
+    const t  = (it.title || "").toLowerCase();
+    const d  = (it.description || "").toLowerCase();
+    const a  = (it.creators || []).join(" ").toLowerCase();
+    const s  = (it.subjects || []).join(" ").toLowerCase();
     const adv = (it.advisors || []).join(" ").toLowerCase();
-    const sup = (it.supervisors || []).join(" ").toLowerCase();
+    const inst = (it.institution || "").toLowerCase();
 
-    const textOK = !q || t.includes(q) || d.includes(q) || a.includes(q) || s.includes(q) || adv.includes(q) || sup.includes(q);
-    const yearOK = !y || (it.year === y);
-    const bucket = typeBucket(it.types || []);
-    const typeOK = !typeVal || bucket === typeVal;
-
-    return textOK && yearOK && typeOK;
+    return t.includes(txt) || d.includes(txt) || a.includes(txt) || s.includes(txt) || adv.includes(txt) || inst.includes(txt);
   });
 }
 
-function renderList() {
-  const mount = el("results");
+function render() {
+  const mount = resultsMount();
   mount.innerHTML = "";
 
-  // hide spinner (if still visible)
-  el("loadingSpinner")?.remove();
-
-  const items = currentFilteredItems();
-
-  // Pagination
+  const items = filteredItems();
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-  if (CURRENT_PAGE > totalPages) CURRENT_PAGE = totalPages;
-  const sliceStart = (CURRENT_PAGE - 1) * PAGE_SIZE;
-  const pageItems = items.slice(sliceStart, sliceStart + PAGE_SIZE);
+  CURRENT_PAGE = Math.min(CURRENT_PAGE, totalPages);
+  const start = (CURRENT_PAGE - 1) * PAGE_SIZE;
+  const pageItems = items.slice(start, start + PAGE_SIZE);
 
   if (!pageItems.length) {
-    mount.innerHTML = `<div class="loading">No results found.</div>`;
+    mount.innerHTML = `<div class="card"><div>No results found.</div></div>`;
   } else {
     pageItems.forEach(it => {
       const card = document.createElement("div");
       card.className = "card";
 
-      const logoUrl = LOGO_MAP.get(CURRENT_INSTITUTION) || "";
-      const logoImg = logoUrl ? `<img class="logo" src="${logoUrl}" alt="${CURRENT_INSTITUTION} logo" onerror="this.style.display='none'">` : "";
-
-      const authors = it.creators?.length ? `<strong>Authors:</strong> ${it.creators.join(", ")}` : "";
-      const yr = it.year ? ` • <strong>Year:</strong> ${it.year}` : "";
-      const tb = typeBucket(it.types || []);
-      const typed = tb ? ` • <strong>Type:</strong> ${tb[0].toUpperCase() + tb.slice(1)}` : "";
-
-      // advisor/supervisor (compact)
-      let advsup = "";
-      const advList = (it.advisors || []).filter(Boolean).slice(0, 2);
-      const supList = (it.supervisors || []).filter(Boolean).slice(0, 2);
-      const parts = [];
-      if (advList.length) parts.push(`<strong>Advisor:</strong> ${advList.join(", ")}`);
-      if (supList.length) parts.push(`<strong>Supervisor:</strong> ${supList.join(", ")}`);
-      if (parts.length) advsup = ` • ${parts.join(" • ")}`;
+      const subjBadges = (it.subjects || []).slice(0, 6).map(s => `<span class="badge">${s}</span>`).join(" ");
+      const advisorText = (it.advisors && it.advisors.length) ? ` • <strong>Advisor:</strong> ${it.advisors.join(", ")}` : "";
 
       card.innerHTML = `
-        ${logoImg}
-        <div class="source-tag">${CURRENT_INSTITUTION}</div>
+        <div class="source-tag">DSpace • ${it.institution}</div>
         <h3>${it.title}</h3>
         <div class="meta">
-          ${authors}${yr}${typed}${advsup}
+          ${it.creators?.length ? `<strong>Authors:</strong> ${it.creators.join(", ")}` : ""}
+          ${it.date ? ` • <strong>Year:</strong> ${it.date.substring(0,4)}` : ""}
+          ${it.typeNorm ? ` • <strong>Type:</strong> ${it.typeNorm[0].toUpperCase()}${it.typeNorm.slice(1)}` : ""}
+          ${advisorText}
         </div>
         <p>${(it.description || "").slice(0, 260)}${(it.description || "").length > 260 ? "…" : ""}</p>
+        ${subjBadges ? `<div class="badges">${subjBadges}</div>` : ""}
         ${it.link ? `<p><a href="${it.link}" target="_blank" rel="noopener">View Record ↗</a></p>` : ""}
       `;
       mount.appendChild(card);
     });
   }
 
-  // Show pagination controls
-  const pagination = el("pagination");
-  const info = el("pageInfo");
+  // Pagination controls
+  const pagination = document.getElementById("pagination");
+  const info = document.getElementById("pageInfo");
   if (items.length <= PAGE_SIZE) {
     pagination.classList.add("hidden");
   } else {
     pagination.classList.remove("hidden");
     info.textContent = `Page ${CURRENT_PAGE} of ${totalPages}`;
-    el("prevPage").disabled = CURRENT_PAGE <= 1;
-    el("nextPage").disabled = CURRENT_PAGE >= totalPages;
-  }
-
-  // If we’re near the end of what we’ve fetched and the repo has more pages, prefetch next pages
-  const entry = INST_CACHE.get(CURRENT_INSTITUTION);
-  const nearEnd = sliceStart + PAGE_SIZE >= entry.items.length - Math.floor(PAGE_SIZE / 2);
-  if (entry?.nextToken && !entry.busy && nearEnd) {
-    // Fetch 3 more OAI pages in background for smoother browsing
-    fetchInstitutionPages(CURRENT_INSTITUTION, 3).then(() => {
-      // No immediate re-render; user will hit Next and see more
-    });
+    document.getElementById("prevPage").disabled = CURRENT_PAGE <= 1;
+    document.getElementById("nextPage").disabled = CURRENT_PAGE >= totalPages;
   }
 }
 
-// ==================
-// Hero Background BG
-// ==================
+/* ---------------------- Ensure data for selected institutions ---------------------- */
+async function ensureSelectedLoaded() {
+  const targets = (!SELECTED_INSTITUTIONS.size ? INSTITUTIONS : Array.from(SELECTED_INSTITUTIONS));
+  for (const name of targets) {
+    const inst = DSPACE_ENDPOINTS.find(d => d.name === name);
+    if (!inst) continue;
+    if (!INST_CACHE.has(name) || !INST_CACHE.get(name).length) {
+      // limit pages moderately; adjust as needed
+      await harvestInstitution(inst, 8);
+    }
+  }
+}
+
+/* ---------------------- Hero Background Animation ---------------------- */
 function initHeroBg() {
   const canvas = document.getElementById("heroBg");
-  if (!canvas) return;
   const ctx = canvas.getContext("2d");
   let w, h, pts;
 
@@ -421,31 +445,45 @@ function initHeroBg() {
   draw();
 }
 
-// ============
-// Main Loader
-// ============
-function bindGlobalFilters() {
-  // In cards mode: the institution dropdown is not used; in list mode, we disable it
-  const searchBox = el("searchInput");
-  searchBox.addEventListener("keypress", e => { if (e.key === "Enter" && CURRENT_MODE === "list") renderList(); });
-
-  el("homeBtn").addEventListener("click", () => {
-    el("institutionFilter").disabled = false;
-    el("typeFilter").value = "";
-    el("yearFilter").value = "";
-    el("searchInput").value = "";
-    SEARCH_TEXT = "";
-    CURRENT_PAGE = 1;
-    renderUniversityCards();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  });
-}
-
+/* ---------------------- Main ---------------------- */
 async function load() {
   initHeroBg();
-  bindGlobalFilters();
-  await loadLogos();
-  renderUniversityCards();
+
+  // Prep institution names list
+  INSTITUTIONS = DSPACE_ENDPOINTS.map(d => d.name);
+
+  // Build filters (empty state first)
+  buildFilters();
+
+  // Load logos & build cards
+  const logos = await loadLogos();
+  renderInstCards(logos);
+
+  // Hook up pagination + home reset
+  document.getElementById("prevPage").addEventListener("click", () => { if (CURRENT_PAGE > 1) { CURRENT_PAGE--; render(); }});
+  document.getElementById("nextPage").addEventListener("click", () => { CURRENT_PAGE++; render(); });
+  document.getElementById("homeBtn").addEventListener("click", () => {
+    SELECTED_INSTITUTIONS.clear();
+    updateInstButtonLabel();
+    document.getElementById("searchInput").value = "";
+    SEARCH_TEXT = ""; YEAR_FILTER = ""; TYPE_FILTER = "";
+    document.getElementById("typeFilter").value = "";
+    CURRENT_PAGE = 1;
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  // OPTIONAL: Light background prefetch (first page) to make initial searches quick.
+  // Comment out if you prefer fetch-on-demand only.
+  for (const inst of DSPACE_ENDPOINTS) {
+    // first page only (fast), then render; deeper pages are loaded when needed
+    if (!INST_CACHE.has(inst.name)) {
+      harvestInstitution(inst, 1).then(() => {
+        render();
+      }).catch(()=>{});
+      await delay(120);
+    }
+  }
 }
 
 document.addEventListener("DOMContentLoaded", load);
