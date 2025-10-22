@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>National Theses & Dissertations Portal (South Africa)</title>
-  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="hero">
@@ -17,16 +17,16 @@
 
   <section class="controls">
     <label>Institution:
-      <select id="institutionSelect" multiple size="6" title="Select one or more institutions"></select>
-      <button id="applyInst">Apply</button>
-      <button id="clearInst">Clear</button>
+      <select id="instSelect">
+        <option value="">All</option>
+      </select>
     </label>
 
     <label>Type:
-      <select id="typeFilter">
-        <option>All</option>
-        <option>Thesis</option>
-        <option>Dissertation</option>
+      <select id="typeSelect">
+        <option value="">All</option>
+        <option value="thesis">Thesis</option>
+        <option value="dissertation">Dissertation</option>
       </select>
     </label>
 
@@ -38,15 +38,13 @@
     </label>
 
     <label>Search/Year:
-      <input id="searchBox" type="text" placeholder="Search title, authors, abstract or a year e.g. 2022"/>
+      <input id="searchBox" type="text" placeholder="Search title, authors, abstract • add year like 2021" />
     </label>
 
     <span class="note">Live OAI-PMH harvest • DSpace</span>
   </section>
 
-  <section class="tiles">
-    <div id="repoGrid" class="repo-grid"></div>
-  </section>
+  <section class="cards" id="repoGrid"></section>
 
   <main id="results" class="results"></main>
 
@@ -61,7 +59,6 @@
     <p>Developed by Vuyo Ngayeka</p>
   </footer>
 
-  <!-- script goes last -->
   <script src="script.js"></script>
 </body>
 </html>
