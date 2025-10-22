@@ -1,3 +1,8 @@
+// =======================================================
+// National Theses & Dissertations Portal (South Africa)
+// DSpace OAI-PMH harvester with cards-first UI
+// =======================================================
+
 const PROXY = "https://inquirybase.archiverepo1.workers.dev/?url=";
 
 /** South African DSpace OAI endpoints (server endpoint preferred; fallback to /oai/request) */
@@ -19,13 +24,13 @@ const PAGE_SIZE_DEFAULT = 100;
 let PAGE_SIZE = PAGE_SIZE_DEFAULT;
 
 let SEARCH_TEXT = "";
-let YEAR_FILTER = "";      
-let TYPE_FILTER = "";      
+let YEAR_FILTER = "";      // extracted from query if 4-digit present
+let TYPE_FILTER = "";      // 'thesis' | 'dissertation' | ''
 let CURRENT_PAGE = 1;
 
-const SELECTED_INSTITUTIONS = new Set(); 
-const INST_CACHE = new Map();            
-let INSTITUTIONS = [];                   
+const SELECTED_INSTITUTIONS = new Set(); // multi-select state
+const INST_CACHE = new Map();            // name -> items[]
+let INSTITUTIONS = [];                   // all known names
 
 // UI nodes
 const resultsMount = () => document.getElementById("results");
@@ -124,7 +129,7 @@ async function harvestInstitution(inst, maxPages = 8) {
         subjects,
         advisors: advisorList(contribs),
         types,
-        typeNorm,                                  
+        typeNorm,                                  // normalized thesis/dissertation
         date: extractYear(dates, descs.join(" ")),
         link: bestLink(ids),
         institution: inst.name,
@@ -167,7 +172,7 @@ async function loadLogos() {
     if (!res.ok) throw new Error("logos.json not found");
     return await res.json();
   } catch {
-    return []; 
+    return []; // continue gracefully without logos
   }
 }
 
@@ -472,7 +477,9 @@ async function load() {
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
-  
+
+  // OPTIONAL: Light background prefetch (first page) to make initial searches quick.
+  // Comment out if you prefer fetch-on-demand only.
   for (const inst of DSPACE_ENDPOINTS) {
     // first page only (fast), then render; deeper pages are loaded when needed
     if (!INST_CACHE.has(inst.name)) {
