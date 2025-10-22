@@ -11,8 +11,8 @@
   <header class="hero">
     <canvas id="heroBg"></canvas>
     <div class="hero-text">
-      <h1 id="homeBtn">National Theses & Dissertations Portal (South Africa)</h1>
-      <p>Discover and explore postgraduate research from South African universities, harvested live via DSpace OAI-PMH.</p>
+      <h1>National Theses & Dissertations Portal (South Africa)</h1>
+      <p>Discover theses & dissertations harvested live from South African DSpace repositories (OAI-PMH).</p>
     </div>
   </header>
 
@@ -20,7 +20,7 @@
   <section class="controls">
     <div class="filters">
       <label>Institution:
-        <select id="institutionFilter"><option value="">All</option></select>
+        <button id="instTrigger" class="dropdown-trigger">All</button>
       </label>
       <label>Type:
         <select id="typeFilter">
@@ -29,9 +29,6 @@
           <option value="dissertation">Dissertation</option>
         </select>
       </label>
-      <label>Year:
-        <input id="yearFilter" type="text" placeholder="e.g. 2023" />
-      </label>
       <label>Page Size:
         <select id="pageSizeSelect">
           <option value="50">50</option>
@@ -39,16 +36,36 @@
         </select>
       </label>
       <label>Search:
-        <input id="searchInput" type="text" placeholder="Search title, authors, abstract, subjects, advisor…" />
+        <input id="searchInput" type="text"
+               placeholder="Search title, authors, abstract, year, institution…" />
       </label>
+      <span class="note">Live OAI-PMH harvest • DSpace</span>
+    </div>
+
+    <!-- Institution selector -->
+    <div id="instPanel" class="inst-panel hidden" role="dialog" aria-label="Choose institutions">
+      <div class="inst-panel-head">
+        <strong>Select institutions</strong>
+        <button id="instClose" class="xbtn" aria-label="Close">✕</button>
+      </div>
+      <div class="inst-panel-body" id="instChecklist"></div>
+      <div class="inst-panel-foot">
+        <button id="instSelectAll" class="ghost">Select all</button>
+        <button id="instApply" class="primary">Apply</button>
+      </div>
     </div>
   </section>
+
+  <div id="hintBar" class="hint hidden"></div>
+
+  <!-- ===== UNIVERSITY GRID ===== -->
+  <section id="instGrid" class="inst-grid"></section>
 
   <!-- ===== RESULTS ===== -->
   <main id="results" class="results">
     <div class="loading" id="loadingSpinner">
       <div class="spinner"></div>
-      <div>Harvesting DSpace repositories…</div>
+      <div>Harvesting DSpace repositories …</div>
     </div>
   </main>
 
@@ -61,7 +78,7 @@
 
   <!-- ===== FOOTER ===== -->
   <footer class="footer">
-    <p>© 2025 National ETD Portal • Built with DSpace OAI-PMH • Powered by Cloudflare Worker</p>
+    <p>© 2025 InquiryBase • DSpace OAI-PMH Harvester • Served via Cloudflare Worker</p>
     <p>Developed by Vuyo Ngayeka</p>
   </footer>
 
