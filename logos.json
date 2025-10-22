@@ -1,50 +1,14 @@
-[
-  {
-    "name": "University of the Free State (UFS)",
-    "logo": "https://scholar.ufs.ac.za/themes/ufstheme/images/logo.png"
-  },
-  {
-    "name": "University of Cape Town (UCT)",
-    "logo": "https://open.uct.ac.za/themes/Mirage2/images/uct-logo.png"
-  },
-  {
-    "name": "Stellenbosch University (SUN)",
-    "logo": "https://scholar.sun.ac.za/themes/Mirage2/images/sun-logo.png"
-  },
-  {
-    "name": "University of Pretoria (UP)",
-    "logo": "https://repository.up.ac.za/themes/Mirage2/images/up-logo.png"
-  },
-  {
-    "name": "University of the Witwatersrand (WITS)",
-    "logo": "https://wiredspace.wits.ac.za/themes/Mirage2/images/wits-logo.png"
-  },
-  {
-    "name": "North-West University (NWU)",
-    "logo": "https://repository.nwu.ac.za/themes/Mirage2/images/nwu-logo.png"
-  },
-  {
-    "name": "University of KwaZulu-Natal (UKZN)",
-    "logo": "https://researchspace.ukzn.ac.za/themes/Mirage2/images/ukzn-logo.png"
-  },
-  {
-    "name": "University of Johannesburg (UJ)",
-    "logo": "https://ujcontent.uj.ac.za/vital/themes/vital/images/uj-logo.png"
-  },
-  {
-    "name": "University of the Western Cape (UWC)",
-    "logo": "https://etd.uwc.ac.za/themes/Mirage2/images/uwc-logo.png"
-  },
-  {
-    "name": "University of South Africa (UNISA)",
-    "logo": "https://uir.unisa.ac.za/themes/Mirage2/images/unisa-logo.png"
-  },
-  {
-    "name": "Central University of Technology (CUT)",
-    "logo": "https://cutscholar.cut.ac.za/themes/Mirage2/images/cut-logo.png"
-  },
-  {
-    "name": "Rhodes University (RU)",
-    "logo": "https://vital.seals.ac.za/vital/themes/Mirage2/images/ru-logo.png"
-  }
-]
+{
+  "University of Cape Town (UCT)": "https://open.uct.ac.za/themes/Mirage2/images/logo.png",
+  "Stellenbosch University (SUNScholar)": "https://scholar.sun.ac.za/themes/Mirage2/images/logo.png",
+  "University of Pretoria (UPSpace)": "https://repository.up.ac.za/themes/Mirage2/images/logo.png",
+  "Wits (WIReDSpace)": "https://wiredspace.wits.ac.za/themes/Mirage2/images/logo.png",
+  "North-West University (NWU)": "https://repository.nwu.ac.za/themes/Mirage2/images/logo.png",
+  "University of KwaZulu-Natal (UKZN)": "https://researchspace.ukzn.ac.za/themes/Mirage2/images/logo.png",
+  "University of the Free State (UFS)": "https://scholar.ufs.ac.za/themes/Mirage2/images/logo.png",
+  "University of the Western Cape (UWC)": "https://etd.uwc.ac.za/themes/Mirage2/images/logo.png",
+  "University of Johannesburg (UJ)": "https://ujcontent.uj.ac.za/themes/Mirage2/images/logo.png",
+  "Rhodes University (RU / SEALS iKamva)": "https://vital.seals.ac.za/themes/Mirage2/images/logo.png",
+  "Central University of Technology (CUT)": "https://cutscholar.cut.ac.za/themes/Mirage2/images/logo.png",
+  "_default": "https://upload.wikimedia.org/wikipedia/commons/1/15/SA_Open_Access_Logo.png"
+}
