@@ -1,17 +1,4 @@
-// =======================================================
-// National ETD Portal (SA) — DSpace Harvester (script.js)
-// =======================================================
 
-/*
-  Features:
-  - Institution cards with logos (grey if offline; tooltip on hover/tap with contact)
-  - Multi-select institution filter (panel) + card click
-  - Single search across title/authors/abstract/subjects/institution/year
-  - Type filter (Thesis/Dissertation) + Page size
-  - Pagination (Prev/Next)
-  - Wrong-repository hint: detects and redirects to the correct repo if title found elsewhere
-  - Progressive harvest: first page for all; deep harvest on selection/click
-*/
 
 const PROXY = "https://inquirybase.archiverepo1.workers.dev/?url=";
 
@@ -640,4 +627,3 @@ async function boot() {
 }
 
 document.addEventListener("DOMContentLoaded", boot);
-
