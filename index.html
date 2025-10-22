@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>National Theses & Dissertations Portal (South Africa)</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
   <header class="hero">
@@ -16,42 +16,39 @@
   </header>
 
   <section class="controls">
-    <div class="filters">
-      <label>Institution:
-        <select id="institutionFilter" multiple>
-          <!-- options injected by script -->
-        </select>
-      </label>
-      <label>Type:
-        <select id="typeFilter">
-          <option value="">All</option>
-          <option value="thesis">Thesis</option>
-          <option value="dissertation">Dissertation</option>
-        </select>
-      </label>
-      <label>Page Size:
-        <select id="pageSizeSelect">
-          <option value="50">50</option>
-          <option value="100" selected>100</option>
-        </select>
-      </label>
-      <label>Search/Year:
-        <input id="searchInput" type="text" placeholder="Search title, authors, abstract, year…" />
-      </label>
-      <span class="note">Live OAI-PMH harvest • DSpace</span>
-    </div>
+    <label>Institution:
+      <select id="institutionSelect" multiple size="6" title="Select one or more institutions"></select>
+      <button id="applyInst">Apply</button>
+      <button id="clearInst">Clear</button>
+    </label>
+
+    <label>Type:
+      <select id="typeFilter">
+        <option>All</option>
+        <option>Thesis</option>
+        <option>Dissertation</option>
+      </select>
+    </label>
+
+    <label>Page Size:
+      <select id="pageSize">
+        <option value="50">50</option>
+        <option value="100" selected>100</option>
+      </select>
+    </label>
+
+    <label>Search/Year:
+      <input id="searchBox" type="text" placeholder="Search title, authors, abstract or a year e.g. 2022"/>
+    </label>
+
+    <span class="note">Live OAI-PMH harvest • DSpace</span>
   </section>
 
-  <section class="institutions" id="instCards">
-    <!-- institution cards injected by script -->
+  <section class="tiles">
+    <div id="repoGrid" class="repo-grid"></div>
   </section>
 
-  <main id="results" class="results">
-    <div class="loading" id="loadingSpinner">
-      <div class="spinner"></div>
-      <div>Preparing repositories…</div>
-    </div>
-  </main>
+  <main id="results" class="results"></main>
 
   <div id="pagination" class="pagination hidden">
     <button id="prevPage">⟨ Prev</button>
@@ -60,10 +57,11 @@
   </div>
 
   <footer class="footer">
-    <p>© 2025 National ETD Portal • DSpace OAI-PMH Harvester • Served via Cloudflare Worker</p>
+    <p>© 2025 InquiryBase • DSpace OAI-PMH Harvester • Served via Cloudflare Worker</p>
     <p>Developed by Vuyo Ngayeka</p>
   </footer>
 
+  <!-- script goes last -->
   <script src="script.js"></script>
 </body>
 </html>
