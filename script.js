@@ -1,168 +1,325 @@
-// =======================================================
-// InquiryBase — DSpace Theses & Dissertations Harvester
-// =======================================================
-
 const PROXY = "https://inquirybase.archiverepo1.workers.dev/?url=";
+const LOGOS_URL = "logos.json";
 
-// Curated DSpace OAI-PMH endpoints (oai_dc). We'll add institutions only when they respond.
+// South African DSpace OAI-PMH endpoints (oai_dc)
 const DSPACE_ENDPOINTS = [
-  // South Africa
+  { name: "University of the Free State (UFS)", url: "https://scholar.ufs.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
   { name: "University of Cape Town (UCT)", url: "https://open.uct.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
   { name: "Stellenbosch University (SUNScholar)", url: "https://scholar.sun.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
   { name: "University of Pretoria (UPSpace)", url: "https://repository.up.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
   { name: "Wits (WIReDSpace)", url: "https://wiredspace.wits.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
   { name: "North-West University (NWU)", url: "https://repository.nwu.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
   { name: "University of KwaZulu-Natal (UKZN)", url: "https://researchspace.ukzn.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of the Free State (UFS)", url: "https://scholar.ufs.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of the Western Cape (UWC)", url: "https://etd.uwc.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
   { name: "University of Johannesburg (UJ)", url: "https://ujcontent.uj.ac.za/vital/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "UNISA (Institutional Repository)", url: "https://uir.unisa.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-
-  // International sample
-  { name: "DSpace@MIT", url: "https://dspace.mit.edu/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "USA" },
-  { name: "Cambridge (Apollo)", url: "https://www.repository.cam.ac.uk/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "UK" },
-  { name: "eCommons (Cornell)", url: "https://ecommons.cornell.edu/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "USA" }
+  { name: "University of the Western Cape (UWC)", url: "https://etd.uwc.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
+  { name: "University of South Africa (UNISA)", url: "https://uir.unisa.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
+  { name: "Central University of Technology (CUT)", url: "https://cutscholar.cut.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
+  { name: "Rhodes University (RU)", url: "https://vital.seals.ac.za/vital/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" }
 ];
 
 const PAGE_SIZE_DEFAULT = 100;
 let PAGE_SIZE = PAGE_SIZE_DEFAULT;
 
+// UI State
+let CURRENT_MODE = "cards"; // "cards" | "list"
+let CURRENT_INSTITUTION = ""; // name when in list mode
 let SEARCH_TEXT = "";
 let CURRENT_PAGE = 1;
 
-let INST_CACHE = new Map();  // instName -> items[]
-let INSTITUTIONS = [];
+// Data caches
+let LOGO_MAP = new Map(); // name -> logoURL
+const INST_CACHE = new Map(); // name -> { items:[], nextToken:null, busy:false }
 
+// Helpers
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
-const nowStamp = () => new Date().toLocaleString();
 
-/** Utility to pull text values from DC nodes (any namespace) */
+function el(id) { return document.getElementById(id); }
 function pick(node, tag) {
   return Array.from(node.getElementsByTagNameNS("*", tag)).map(n => (n.textContent || "").trim());
 }
-
-/** Determine if a record looks like a thesis/dissertation based on dc:type (and sometimes dc:description) */
+function pickTags(node, tags) {
+  let out = [];
+  tags.forEach(t => { out = out.concat(pick(node, t)); });
+  return out;
+}
+function bestLink(identifiers = []) {
+  const http = identifiers.find(i => /^https?:\/\//i.test(i));
+  if (http) return http;
+  const handle = identifiers.find(i => /hdl\.handle\.net/i.test(i));
+  if (handle) return handle.startsWith("http") ? handle : `https://${handle}`;
+  const doi = identifiers.find(i => /^10\./.test(i));
+  return doi ? `https://doi.org/${doi}` : "";
+}
 function isThesisLike(types = [], desc = "") {
   const hay = (types.join(" ") + " " + desc).toLowerCase();
-  return /thesis|dissertation|doctoral|masters|phd|m\.sc|m\s?thesis|dphil/.test(hay);
+  return /thesis|dissertation|doctoral|masters|m\.sc|m\s?thesis|dphil|phd/.test(hay);
 }
-
-/** Select a usable link from dc:identifier values (prefer http/https; fallback handle; else blank). */
-function bestLink(identifiers = []) {
-  const http = identifiers.find(i => i.startsWith("http"));
-  if (http) return http;
-  const handle = identifiers.find(i => i.includes("hdl.handle.net"));
-  if (handle) return "https://" + handle.replace(/^https?:\/\//, "");
-  const doi = identifiers.find(i => /^10\./.test(i));
-  if (doi) return `https://doi.org/${doi}`;
+function normalizeYear(dates = []) {
+  for (const d of dates) {
+    const m = d && d.match(/\b(19|20)\d{2}\b/);
+    if (m) return m[0];
+  }
+  return "";
+}
+function typeBucket(types = []) {
+  const t = (types.join(" ") || "").toLowerCase();
+  if (/dissertation|doctoral|phd|dphil/.test(t)) return "dissertation";
+  if (/thesis|masters|m\.sc|m\s?thesis/.test(t)) return "thesis";
   return "";
 }
 
-/** Fetch 1 OAI page for an institution (for speed) */
-async function fetchInstitutionFirstPage(inst) {
+// =====================
+// University Cards View
+// =====================
+async function loadLogos() {
   try {
-    const url = inst.url;
-    const res = await fetch(PROXY + encodeURIComponent(url));
-    const text = await res.text();
-    const xml = new DOMParser().parseFromString(text, "text/xml");
-
-    const records = Array.from(xml.getElementsByTagNameNS("*", "record"));
-    if (!records.length) return [];
-
-    const items = records.map(r => {
-      const md = r.getElementsByTagNameNS("*", "metadata")[0];
-      if (!md) return null;
-      // dc fields
-      const titles = pick(md, "title");
-      const creators = pick(md, "creator");
-      const descs = pick(md, "description");
-      const subjects = pick(md, "subject");
-      const types = pick(md, "type");
-      const dates = pick(md, "date");
-      const ids = pick(md, "identifier");
-
-      const description = descs[0] || "";
-      if (!isThesisLike(types, description)) return null;
-
-      return {
-        title: titles[0] || "(Untitled)",
-        creators,
-        description,
-        subjects,
-        types,
-        date: dates[0] || "",
-        link: bestLink(ids),
-        institution: inst.name,
-        country: inst.country
-      };
-    }).filter(Boolean);
-
-    console.log(`✅ ${inst.name}: ${items.length} thesis-like records (first page)`);
-    return items;
+    const logos = await fetch(LOGOS_URL).then(r => r.json());
+    LOGO_MAP = new Map(logos.map(x => [x.name, x.logo]));
   } catch (e) {
-    console.warn(`⚠️ Failed to fetch ${inst.name}`, e);
-    return [];
+    console.warn("logos.json load failed:", e);
+    LOGO_MAP = new Map();
   }
 }
 
-/** Fade out spinner once we have content */
-function fadeOutSpinner() {
-  const spinner = document.getElementById("loadingSpinner");
-  if (spinner) spinner.classList.add("fade-out");
-  setTimeout(() => spinner?.remove(), 700);
+function renderUniversityCards() {
+  CURRENT_MODE = "cards";
+  CURRENT_INSTITUTION = "";
+  el("pagination")?.classList.add("hidden");
+
+  // Reset/disable institution/type/year controls while in cards mode
+  el("institutionFilter").innerHTML = `<option value="">All</option>`;
+  el("typeFilter").value = "";
+  el("yearFilter").value = "";
+  el("searchInput").value = "";
+  SEARCH_TEXT = "";
+  CURRENT_PAGE = 1;
+
+  // Show Back button only in list mode; ensure hidden now
+  ensureBackButton(false);
+
+  const mount = el("results");
+  mount.innerHTML = "";
+
+  DSPACE_ENDPOINTS.forEach(({ name }) => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const logoUrl = LOGO_MAP.get(name) || "";
+    const logoImg = logoUrl ? `<img class="logo" src="${logoUrl}" alt="${name} logo" onerror="this.style.display='none'">` : "";
+
+    card.innerHTML = `
+      ${logoImg}
+      <h3>${name}</h3>
+      <p>Explore theses and dissertations from this repository.</p>
+      <p><a href="#" data-inst="${name}">View Records ↗</a></p>
+    `;
+    card.querySelector("a").addEventListener("click", (e) => {
+      e.preventDefault();
+      openInstitution(name);
+    });
+    mount.appendChild(card);
+  });
 }
 
-/** Build/refresh filters */
-function buildFilters() {
-  const instSel = document.getElementById("institutionFilter");
-  instSel.innerHTML = `<option value="">All</option>` + INSTITUTIONS.map(n => `<option value="${n}">${n}</option>`).join("");
-  instSel.addEventListener("change", () => { CURRENT_PAGE = 1; render(); });
+// ======================
+// Institution List View
+// ======================
+async function openInstitution(instName) {
+  CURRENT_MODE = "list";
+  CURRENT_INSTITUTION = instName;
+  CURRENT_PAGE = 1;
 
-  const pageSel = document.getElementById("pageSizeSelect");
+  // Set institution dropdown to current and disable it (to reinforce focused view)
+  const instSel = el("institutionFilter");
+  instSel.innerHTML = `<option value="${instName}" selected>${instName}</option>`;
+  instSel.disabled = true;
+
+  ensureBackButton(true);
+
+  // Ensure cache entry
+  if (!INST_CACHE.has(instName)) {
+    INST_CACHE.set(instName, { items: [], nextToken: null, busy: false });
+  }
+
+  // If nothing fetched yet, fetch initial batch (up to 5 OAI pages)
+  const entry = INST_CACHE.get(instName);
+  if (!entry.items.length && !entry.busy) {
+    await fetchInstitutionPages(instName, 5);
+  }
+
+  // Populate type/year/search events
+  bindListFilters();
+
+  // Render results
+  renderList();
+}
+
+function ensureBackButton(show) {
+  let btn = el("backBtn");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.id = "backBtn";
+    btn.textContent = "← Back to Universities";
+    btn.style.marginLeft = "8px";
+    btn.style.background = "#6b7280";
+    btn.style.color = "#fff";
+    btn.style.border = "none";
+    btn.style.borderRadius = "5px";
+    btn.style.padding = "6px 10px";
+    btn.style.cursor = "pointer";
+    btn.addEventListener("click", () => {
+      // enable institution dropdown again
+      el("institutionFilter").disabled = false;
+      renderUniversityCards();
+    });
+    // attach to filters bar
+    const filtersBar = document.querySelector(".controls .filters");
+    if (filtersBar) filtersBar.appendChild(btn);
+  }
+  btn.style.display = show ? "inline-block" : "none";
+}
+
+async function fetchInstitutionPages(instName, maxPages = 5) {
+  const inst = DSPACE_ENDPOINTS.find(e => e.name === instName);
+  if (!inst) return;
+
+  const entry = INST_CACHE.get(instName);
+  if (!entry || entry.busy) return;
+
+  entry.busy = true;
+
+  let url = entry.nextToken
+    ? `${inst.url.split("?")[0]}?verb=ListRecords&resumptionToken=${encodeURIComponent(entry.nextToken)}`
+    : inst.url;
+
+  let page = 0;
+
+  try {
+    while (url && page < maxPages) {
+      page++;
+      const res = await fetch(PROXY + encodeURIComponent(url));
+      const text = await res.text();
+      const xml = new DOMParser().parseFromString(text, "text/xml");
+
+      const records = Array.from(xml.getElementsByTagNameNS("*", "record"));
+      const tokenNode = xml.getElementsByTagNameNS("*", "resumptionToken")[0];
+      const nextToken = tokenNode ? tokenNode.textContent.trim() : null;
+
+      records.forEach(r => {
+        const md = r.getElementsByTagNameNS("*", "metadata")[0];
+        if (!md) return;
+
+        // core DC fields
+        const titles = pick(md, "title");
+        const creators = pick(md, "creator");
+        // Many repos use dc:description AND dc:abstract (qualified)
+        const descriptions = pickTags(md, ["description", "abstract"]);
+        const subjects = pick(md, "subject");
+        const types = pick(md, "type");
+        const dates = pick(md, "date");
+        const identifiers = pick(md, "identifier");
+
+        // Advisors/supervisors (some expose as qualified DC)
+        const advisors = pickTags(md, ["contributor.advisor", "advisor", "contributor"]);
+        const supervisors = pickTags(md, ["contributor.supervisor", "supervisor", "contributor"]);
+
+        const description = descriptions[0] || "";
+        if (!isThesisLike(types, description)) return;
+
+        const item = {
+          title: titles[0] || "(Untitled)",
+          creators,
+          description,
+          subjects,
+          advisors,
+          supervisors,
+          types,
+          year: normalizeYear(dates),
+          link: bestLink(identifiers),
+          institution: instName
+        };
+
+        entry.items.push(item);
+      });
+
+      entry.nextToken = nextToken || null;
+      url = nextToken
+        ? `${inst.url.split("?")[0]}?verb=ListRecords&resumptionToken=${encodeURIComponent(nextToken)}`
+        : null;
+
+      // be polite to repos
+      await delay(200);
+    }
+  } catch (e) {
+    console.warn(`Fetch failed for ${instName}:`, e);
+  } finally {
+    entry.busy = false;
+  }
+}
+
+function bindListFilters() {
+  const pageSel = el("pageSizeSelect");
   PAGE_SIZE = parseInt(pageSel.value, 10) || PAGE_SIZE_DEFAULT;
-  pageSel.addEventListener("change", () => {
+  pageSel.onchange = () => {
     PAGE_SIZE = parseInt(pageSel.value, 10) || PAGE_SIZE_DEFAULT;
-    CURRENT_PAGE = 1; render();
-  });
+    CURRENT_PAGE = 1; renderList();
+  };
 
-  const searchBox = document.getElementById("searchInput");
-  searchBox.addEventListener("input", e => { SEARCH_TEXT = e.target.value.toLowerCase(); CURRENT_PAGE = 1; render(); });
-  searchBox.addEventListener("keypress", e => { if (e.key === "Enter") render(); });
+  const typeSel = el("typeFilter");
+  typeSel.onchange = () => { CURRENT_PAGE = 1; renderList(); };
+
+  const yearSel = el("yearFilter");
+  yearSel.oninput = () => { CURRENT_PAGE = 1; renderList(); };
+
+  const searchBox = el("searchInput");
+  searchBox.oninput = (e) => { SEARCH_TEXT = e.target.value.toLowerCase(); CURRENT_PAGE = 1; renderList(); };
+  searchBox.onkeypress = (e) => { if (e.key === "Enter") renderList(); };
+
+  // Prev/Next paging
+  el("prevPage").onclick = () => { if (CURRENT_PAGE > 1) { CURRENT_PAGE--; renderList(); } };
+  el("nextPage").onclick = () => { CURRENT_PAGE++; renderList(); };
 }
 
-/** Compute filtered pool from INST_CACHE + filters/search */
-function filteredItems() {
-  const instSel = document.getElementById("institutionFilter")?.value || "";
-  const text = SEARCH_TEXT;
+function currentFilteredItems() {
+  const entry = INST_CACHE.get(CURRENT_INSTITUTION) || { items: [] };
+  const items = entry.items;
 
-  let pool = [];
-  INST_CACHE.forEach((items, name) => {
-    if (!instSel || instSel === name) pool.push(...items);
-  });
+  const q = (SEARCH_TEXT || "").trim();
+  const y = (el("yearFilter")?.value || "").trim();
+  const typeVal = (el("typeFilter")?.value || "").trim(); // "thesis" | "dissertation" | ""
 
-  if (!text) return pool;
-
-  return pool.filter(it => {
+  return items.filter(it => {
+    // search across title, description/abstract, authors, subjects, advisors/supervisors
     const t = (it.title || "").toLowerCase();
     const d = (it.description || "").toLowerCase();
     const a = (it.creators || []).join(" ").toLowerCase();
     const s = (it.subjects || []).join(" ").toLowerCase();
-    const inst = (it.institution || "").toLowerCase();
-    return t.includes(text) || d.includes(text) || a.includes(text) || s.includes(text) || inst.includes(text);
+    const adv = (it.advisors || []).join(" ").toLowerCase();
+    const sup = (it.supervisors || []).join(" ").toLowerCase();
+
+    const textOK = !q || t.includes(q) || d.includes(q) || a.includes(q) || s.includes(q) || adv.includes(q) || sup.includes(q);
+    const yearOK = !y || (it.year === y);
+    const bucket = typeBucket(it.types || []);
+    const typeOK = !typeVal || bucket === typeVal;
+
+    return textOK && yearOK && typeOK;
   });
 }
 
-/** Render cards + pagination + overview */
-function render() {
-  const mount = document.getElementById("results");
+function renderList() {
+  const mount = el("results");
   mount.innerHTML = "";
 
-  const items = filteredItems();
-  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-  CURRENT_PAGE = Math.min(CURRENT_PAGE, totalPages);
+  // hide spinner (if still visible)
+  el("loadingSpinner")?.remove();
 
-  const start = (CURRENT_PAGE - 1) * PAGE_SIZE;
-  const pageItems = items.slice(start, start + PAGE_SIZE);
+  const items = currentFilteredItems();
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  if (CURRENT_PAGE > totalPages) CURRENT_PAGE = totalPages;
+  const sliceStart = (CURRENT_PAGE - 1) * PAGE_SIZE;
+  const pageItems = items.slice(sliceStart, sliceStart + PAGE_SIZE);
 
   if (!pageItems.length) {
     mount.innerHTML = `<div class="loading">No results found.</div>`;
@@ -171,72 +328,69 @@ function render() {
       const card = document.createElement("div");
       card.className = "card";
 
-      const subjBadges = (it.subjects || []).slice(0, 6).map(s => `<span class="badge">${s}</span>`).join(" ");
+      const logoUrl = LOGO_MAP.get(CURRENT_INSTITUTION) || "";
+      const logoImg = logoUrl ? `<img class="logo" src="${logoUrl}" alt="${CURRENT_INSTITUTION} logo" onerror="this.style.display='none'">` : "";
+
+      const authors = it.creators?.length ? `<strong>Authors:</strong> ${it.creators.join(", ")}` : "";
+      const yr = it.year ? ` • <strong>Year:</strong> ${it.year}` : "";
+      const tb = typeBucket(it.types || []);
+      const typed = tb ? ` • <strong>Type:</strong> ${tb[0].toUpperCase() + tb.slice(1)}` : "";
+
+      // advisor/supervisor (compact)
+      let advsup = "";
+      const advList = (it.advisors || []).filter(Boolean).slice(0, 2);
+      const supList = (it.supervisors || []).filter(Boolean).slice(0, 2);
+      const parts = [];
+      if (advList.length) parts.push(`<strong>Advisor:</strong> ${advList.join(", ")}`);
+      if (supList.length) parts.push(`<strong>Supervisor:</strong> ${supList.join(", ")}`);
+      if (parts.length) advsup = ` • ${parts.join(" • ")}`;
 
       card.innerHTML = `
-        <div class="source-tag">DSpace • ${it.institution}</div>
+        ${logoImg}
+        <div class="source-tag">${CURRENT_INSTITUTION}</div>
         <h3>${it.title}</h3>
         <div class="meta">
-          ${it.creators?.length ? `<strong>Authors:</strong> ${it.creators.join(", ")}` : ""}
-          ${it.date ? ` • <strong>Year:</strong> ${it.date.substring(0,4)}` : ""}
-          ${it.types?.length ? ` • <strong>Type:</strong> ${it.types[0]}` : ""}
+          ${authors}${yr}${typed}${advsup}
         </div>
         <p>${(it.description || "").slice(0, 260)}${(it.description || "").length > 260 ? "…" : ""}</p>
-        ${subjBadges ? `<div class="badges">${subjBadges}</div>` : ""}
         ${it.link ? `<p><a href="${it.link}" target="_blank" rel="noopener">View Record ↗</a></p>` : ""}
       `;
       mount.appendChild(card);
     });
   }
 
-  // Pagination controls
-  const pagination = document.getElementById("pagination");
-  const info = document.getElementById("pageInfo");
+  // Show pagination controls
+  const pagination = el("pagination");
+  const info = el("pageInfo");
   if (items.length <= PAGE_SIZE) {
     pagination.classList.add("hidden");
   } else {
     pagination.classList.remove("hidden");
     info.textContent = `Page ${CURRENT_PAGE} of ${totalPages}`;
-    document.getElementById("prevPage").disabled = CURRENT_PAGE <= 1;
-    document.getElementById("nextPage").disabled = CURRENT_PAGE >= totalPages;
+    el("prevPage").disabled = CURRENT_PAGE <= 1;
+    el("nextPage").disabled = CURRENT_PAGE >= totalPages;
   }
 
-  updateOverview();
-  fadeOutSpinner();
+  // If we’re near the end of what we’ve fetched and the repo has more pages, prefetch next pages
+  const entry = INST_CACHE.get(CURRENT_INSTITUTION);
+  const nearEnd = sliceStart + PAGE_SIZE >= entry.items.length - Math.floor(PAGE_SIZE / 2);
+  if (entry?.nextToken && !entry.busy && nearEnd) {
+    // Fetch 3 more OAI pages in background for smoother browsing
+    fetchInstitutionPages(CURRENT_INSTITUTION, 3).then(() => {
+      // No immediate re-render; user will hit Next and see more
+    });
+  }
 }
 
-/** Overview panel: totals, top subjects, top types */
-function updateOverview() {
-  const panel = document.getElementById("overview");
-  const all = Array.from(INST_CACHE.values()).flat();
-  const total = all.length;
-  const instCount = INSTITUTIONS.length;
-
-  document.getElementById("countTotal").textContent = total;
-  document.getElementById("countInst").textContent = instCount;
-
-  const subjFreq = {};
-  const typeFreq = {};
-  all.forEach(it => {
-    (it.subjects || []).forEach(s => { if (!s) return; subjFreq[s] = (subjFreq[s] || 0) + 1; });
-    (it.types || []).forEach(t => { if (!t) return; typeFreq[t] = (typeFreq[t] || 0) + 1; });
-  });
-
-  const topSubjects = Object.entries(subjFreq).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const topTypes = Object.entries(typeFreq).sort((a,b)=>b[1]-a[1]).slice(0,5);
-
-  document.getElementById("topSubjects").innerHTML = topSubjects.map(([s,n])=>`<li>${s} (${n})</li>`).join("");
-  document.getElementById("topTypes").innerHTML = topTypes.map(([t,n])=>`<li>${t} (${n})</li>`).join("");
-
-  document.getElementById("stamp").textContent = `Last updated: ${nowStamp()}`;
-  panel.classList.remove("hidden");
-}
-
-/** Hero background animation */
+// ==================
+// Hero Background BG
+// ==================
 function initHeroBg() {
   const canvas = document.getElementById("heroBg");
+  if (!canvas) return;
   const ctx = canvas.getContext("2d");
   let w, h, pts;
+
   function resize() {
     w = canvas.width = window.innerWidth;
     h = canvas.height = 260;
@@ -247,6 +401,7 @@ function initHeroBg() {
   }
   resize();
   window.addEventListener("resize", resize);
+
   function draw() {
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = "#cde3ff";
@@ -266,44 +421,31 @@ function initHeroBg() {
   draw();
 }
 
-/** Main load */
+// ============
+// Main Loader
+// ============
+function bindGlobalFilters() {
+  // In cards mode: the institution dropdown is not used; in list mode, we disable it
+  const searchBox = el("searchInput");
+  searchBox.addEventListener("keypress", e => { if (e.key === "Enter" && CURRENT_MODE === "list") renderList(); });
+
+  el("homeBtn").addEventListener("click", () => {
+    el("institutionFilter").disabled = false;
+    el("typeFilter").value = "";
+    el("yearFilter").value = "";
+    el("searchInput").value = "";
+    SEARCH_TEXT = "";
+    CURRENT_PAGE = 1;
+    renderUniversityCards();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+}
+
 async function load() {
   initHeroBg();
-
-  // Build empty filters & pagination events
-  buildFilters();
-
-  document.getElementById("prevPage").addEventListener("click", () => {
-    if (CURRENT_PAGE > 1) { CURRENT_PAGE--; render(); }
-  });
-  document.getElementById("nextPage").addEventListener("click", () => {
-    CURRENT_PAGE++; render();
-  });
-
-  document.getElementById("homeBtn").addEventListener("click", () => {
-    const instSel = document.getElementById("institutionFilter");
-    const search = document.getElementById("searchInput");
-    instSel.value = ""; search.value = ""; SEARCH_TEXT = ""; CURRENT_PAGE = 1;
-    render(); window.scrollTo({ top: 0, behavior: "smooth" });
-  });
-
-  // Harvest: small first page from each repo (fast)
-  for (const inst of DSPACE_ENDPOINTS) {
-    // Stagger requests lightly to be kind to servers
-    // (and avoid proxy queueing)
-    // eslint-disable-next-line no-await-in-loop
-    await delay(120);
-
-    fetchInstitutionFirstPage(inst).then(items => {
-      if (items.length > 0) {
-        INST_CACHE.set(inst.name, items);
-        if (!INSTITUTIONS.includes(inst.name)) INSTITUTIONS.push(inst.name);
-        INSTITUTIONS.sort((a, b) => a.localeCompare(b));
-        buildFilters();
-        render();
-      }
-    });
-  }
+  bindGlobalFilters();
+  await loadLogos();
+  renderUniversityCards();
 }
 
 document.addEventListener("DOMContentLoaded", load);
