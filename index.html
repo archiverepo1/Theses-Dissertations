@@ -7,73 +7,61 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- ===== HERO ===== -->
   <header class="hero">
     <canvas id="heroBg"></canvas>
     <div class="hero-text">
       <h1>National Theses & Dissertations Portal (South Africa)</h1>
-      <p>Discover theses & dissertations harvested live from South African Institutional repositories (OAI-PMH).</p>
+      <p>Discover theses & dissertations harvested live from South African DSpace repositories (OAI-PMH).</p>
     </div>
   </header>
 
-  <!-- ===== FILTERS ===== -->
   <section class="controls">
-    <label>Institution:
-      <select id="institutionFilter">
-        <option value="">All</option>
-      </select>
-    </label>
-
-    <label>Type:
-      <select id="typeFilter">
-        <option value="All">All</option>
-        <option value="Thesis">Thesis</option>
-        <option value="Dissertation">Dissertation</option>
-      </select>
-    </label>
-
-    <label>Year:
-      <input id="yearFilter" type="number" placeholder="e.g. 2023" min="1900" max="2099" />
-    </label>
-
-    <label>Page Size:
-      <select id="pageSizeSelect">
-        <option value="50">50</option>
-        <option value="100" selected>100</option>
-      </select>
-    </label>
-
-    <label>Search:
-      <input id="searchInput" type="text" placeholder="Search title, authors, abstract, keywords…" />
-    </label>
-
-    <span class="note">Live OAI-PMH harvest • DSpace</span>
+    <div class="filters">
+      <label>Institution:
+        <select id="institutionFilter" multiple>
+          <!-- options injected by script -->
+        </select>
+      </label>
+      <label>Type:
+        <select id="typeFilter">
+          <option value="">All</option>
+          <option value="thesis">Thesis</option>
+          <option value="dissertation">Dissertation</option>
+        </select>
+      </label>
+      <label>Page Size:
+        <select id="pageSizeSelect">
+          <option value="50">50</option>
+          <option value="100" selected>100</option>
+        </select>
+      </label>
+      <label>Search/Year:
+        <input id="searchInput" type="text" placeholder="Search title, authors, abstract, year…" />
+      </label>
+      <span class="note">Live OAI-PMH harvest • DSpace</span>
+    </div>
   </section>
 
-  <!-- ===== INSTITUTIONS GRID ===== -->
-  <section id="institutionGrid" class="institution-grid">
-    <!-- Institution cards dynamically inserted here -->
+  <section class="institutions" id="instCards">
+    <!-- institution cards injected by script -->
   </section>
 
-  <!-- ===== RESULTS ===== -->
   <main id="results" class="results">
     <div class="loading" id="loadingSpinner">
       <div class="spinner"></div>
-      <div>Harvesting repositories…</div>
+      <div>Preparing repositories…</div>
     </div>
   </main>
 
-  <!-- ===== PAGINATION ===== -->
   <div id="pagination" class="pagination hidden">
     <button id="prevPage">⟨ Prev</button>
     <span id="pageInfo">Page 1 of 1</span>
     <button id="nextPage">Next ⟩</button>
   </div>
 
-  <!-- ===== FOOTER ===== -->
   <footer class="footer">
-    <p>© 2025 National Theses & Dissertations Portal (South Africa) • DSpace OAI-PMH Harvester • Served via GitHub & Cloudflare</p>
-    <p>Developed by <strong>Vuyo Ngayeka</strong></p>
+    <p>© 2025 National ETD Portal • DSpace OAI-PMH Harvester • Served via Cloudflare Worker</p>
+    <p>Developed by Vuyo Ngayeka</p>
   </footer>
 
   <script src="script.js"></script>
