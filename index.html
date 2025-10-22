@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>InquiryBase — Theses & Dissertations (DSpace)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ===== HERO ===== -->
+  <header class="hero">
+    <canvas id="heroBg"></canvas>
+    <div class="hero-text">
+      <h1 id="homeBtn">InquiryBase</h1>
+      <p>Discover theses & dissertations harvested live from DSpace repositories (OAI-PMH).</p>
+    </div>
+  </header>
+
+  <!-- ===== FILTERS ===== -->
+  <section class="controls">
+    <div class="filters">
+      <label>Institution:
+        <select id="institutionFilter"><option value="">All</option></select>
+      </label>
+      <label>Page Size:
+        <select id="pageSizeSelect">
+          <option value="50">50</option>
+          <option value="100" selected>100</option>
+        </select>
+      </label>
+      <label>Search:
+        <input id="searchInput" type="text" placeholder="Search title, authors, abstract, subjects, institution…" />
+      </label>
+      <span class="note">Live OAI-PMH harvest • DSpace</span>
+    </div>
+
+    <aside id="overview" class="overview hidden">
+      <h3>📊 Data Overview</h3>
+      <p><strong>Total:</strong> <span id="countTotal">0</span> records</p>
+      <p><strong>Institutions:</strong> <span id="countInst">0</span></p>
+      <h4>Top Subjects</h4>
+      <ul id="topSubjects"></ul>
+      <h4>Top Degree Types</h4>
+      <ul id="topTypes"></ul>
+      <p class="stamp" id="stamp"></p>
+    </aside>
+  </section>
+
+  <!-- ===== RESULTS ===== -->
+  <main id="results" class="results">
+    <div class="loading" id="loadingSpinner">
+      <div class="spinner"></div>
+      <div>Harvesting DSpace repositories…</div>
+    </div>
+  </main>
+
+  <!-- ===== PAGINATION ===== -->
+  <div id="pagination" class="pagination hidden">
+    <button id="prevPage">⟨ Prev</button>
+    <span id="pageInfo">Page 1 of 1</span>
+    <button id="nextPage">Next ⟩</button>
+  </div>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <p>© 2025 InquiryBase • DSpace OAI-PMH Harvester • Served via Cloudflare Worker</p>
+    <p>Developed by Vuyo Ngayeka</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
