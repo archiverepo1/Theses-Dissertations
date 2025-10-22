@@ -1,81 +1,150 @@
 
-const PROXY = "https://thesesdissertations.archiverepo1.workers.dev/?url=";
+const PROXY = "https://inquirybase.archiverepo1.workers.dev/?url=";
+const PAGE_SIZE_DEFAULT = 100;
 
-// ===== Verified South African DSpace OAI-PMH Repositories =====
-const DSPACE_ENDPOINTS = [
-  { name: "University of Cape Town (UCT)", url: "https://open.uct.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "Stellenbosch University (SUNScholar)", url: "https://scholar.sun.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of Pretoria (UPSpace)", url: "https://repository.up.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "Wits (WIReDSpace)", url: "https://wiredspace.wits.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "North-West University (NWU)", url: "https://repository.nwu.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of KwaZulu-Natal (UKZN)", url: "https://researchspace.ukzn.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of the Free State (UFS)", url: "https://scholar.ufs.ac.za/server/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of the Western Cape (UWC)", url: "https://etd.uwc.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of Johannesburg (UJ)", url: "https://ujcontent.uj.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "Rhodes University (RU / SEALS iKamva)", url: "https://vital.seals.ac.za/vital/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "Central University of Technology (CUT)", url: "https://cutscholar.cut.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" },
-  { name: "University of South Africa (UNISA)", url: "https://uir.unisa.ac.za/oai/request?verb=ListRecords&metadataPrefix=oai_dc", country: "South Africa" }
+const SOURCES = [
+  // DSpace 7 (OAI available)
+  { name: "University of Cape Town (UCT)", country: "South Africa",
+    home: "https://open.uct.ac.za/",
+    oai:  "https://open.uct.ac.za/server/oai/request",
+    type: "dspace" },
+  { name: "Stellenbosch University (SUNScholar)", country: "South Africa",
+    home: "https://scholar.sun.ac.za/",
+    oai:  "https://scholar.sun.ac.za/server/oai/request",
+    type: "dspace" },
+  { name: "University of Pretoria (UPSpace)", country: "South Africa",
+    home: "https://repository.up.ac.za/",
+    oai:  "https://repository.up.ac.za/server/oai/request",
+    type: "dspace" },
+  { name: "Wits (WIReDSpace)", country: "South Africa",
+    home: "https://wiredspace.wits.ac.za/",
+    oai:  "https://wiredspace.wits.ac.za/server/oai/request",
+    type: "dspace" },
+  { name: "North-West University (NWU)", country: "South Africa",
+    home: "https://repository.nwu.ac.za/",
+    oai:  "https://repository.nwu.ac.za/server/oai/request",
+    type: "dspace" },
+  { name: "University of KwaZulu-Natal (UKZN)", country: "South Africa",
+    home: "https://researchspace.ukzn.ac.za/",
+    oai:  "https://researchspace.ukzn.ac.za/server/oai/request",
+    type: "dspace" },
+  { name: "University of the Free State (UFS)", country: "South Africa",
+    home: "https://scholar.ufs.ac.za/",
+    oai:  "https://scholar.ufs.ac.za/server/oai/request",
+    type: "dspace" },
+  { name: "University of the Western Cape (UWC)", country: "South Africa",
+    home: "https://uwcscholar.uwc.ac.za/",
+    oai:  "https://uwcscholar.uwc.ac.za/server/oai/request",
+    type: "dspace" },
+  { name: "University of South Africa (UNISA)", country: "South Africa",
+    home: "https://uir.unisa.ac.za/",
+    oai:  "https://uir.unisa.ac.za/server/oai/request",
+    type: "dspace" },
+  { name: "Central University of Technology (CUT)", country: "South Africa",
+    home: "https://cutscholar.cut.ac.za/",
+    oai:  "https://cutscholar.cut.ac.za/server/oai/request",
+    type: "dspace" },
+  { name: "Cape Peninsula University of Technology (CPUT)", country: "South Africa",
+    home: "https://etd.cput.ac.za/",
+    oai:  "https://etd.cput.ac.za/server/oai/request",
+    type: "dspace" },
+
+  // Unknown/Non-DSpace currently (listed, not harvested)
+  { name: "University of Johannesburg (UJ)", country: "South Africa",
+    home: "https://ujcontent.uj.ac.za/esploro/",
+    oai:  "",
+    type: "external", externalNote: "Esploro (Clarivate) – search on site" },
+
+  { name: "Rhodes University (RU / SEALS iKamva)", country: "South Africa",
+    home: "https://vital.seals.ac.za/",
+    oai:  "", type: "external", externalNote: "SEALS / Vital – search on site" },
+
+  { name: "Nelson Mandela University (NMU)", country: "South Africa",
+    home: "https://commons.mandela.ac.za/",
+    oai:  "", type: "external", externalNote: "Non-DSpace – search on site" },
+
+  { name: "Durban University of Technology (DUT)", country: "South Africa",
+    home: "https://openscholar.dut.ac.za/",
+    oai:  "", type: "external", externalNote: "Non-DSpace – search on site" }
 ];
 
-// ====== Core Variables ======
-const PAGE_SIZE_DEFAULT = 100;
+// Global state
+let LOGOS = {};
 let PAGE_SIZE = PAGE_SIZE_DEFAULT;
 let SEARCH_TEXT = "";
 let CURRENT_PAGE = 1;
-let SELECTED_INSTITUTIONS = new Set();
-let INST_CACHE = new Map();
-let LOGOS = {};
-let TYPE_FILTER = "All";
-let YEAR_FILTER = "";
+let SELECTED_INSTITUTIONS = new Set(); // via cards or dropdown
+let ALL_RECORDS = []; // unified pool
+const CACHE = new Map(); // name -> { online, items, checked }
 
-// ====== Utilities ======
-const delay = (ms) => new Promise((r) => setTimeout(r, ms));
-const nowStamp = () => new Date().toLocaleString();
+// Utils
+const delay = (ms) => new Promise(r => setTimeout(r, ms));
+const trim = (s) => (s || "").trim();
+const pick = (node, tag) =>
+  Array.from(node.getElementsByTagNameNS("*", tag)).map(n => trim(n.textContent || ""));
 
-function pick(node, tag) {
-  return Array.from(node.getElementsByTagNameNS("*", tag)).map((n) => (n.textContent || "").trim());
+// Hero animation
+function initHeroBg() {
+  const canvas = document.getElementById("heroBg");
+  const ctx = canvas.getContext("2d");
+  let w, h, pts;
+  const resize = () => {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = 260;
+    pts = Array.from({ length: 60 }, () => ({
+      x: Math.random() * w, y: Math.random() * h,
+      vx: (Math.random() - .5) * .6, vy: (Math.random() - .5) * .6
+    }));
+  };
+  resize(); window.addEventListener("resize", resize);
+  const draw = () => {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#cde3ff";
+    pts.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > w) p.vx *= -1;
+      if (p.y < 0 || p.y > h) p.vy *= -1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.strokeStyle = "rgba(205,227,255,.2)";
+    for (let i = 0; i < pts.length; i++)
+      for (let j = i + 1; j < pts.length; j++) {
+        const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+        if (Math.sqrt(dx*dx + dy*dy) < 100) {
+          ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke();
+        }
+      }
+    requestAnimationFrame(draw);
+  };
+  draw();
 }
 
-function isThesisLike(types = [], desc = "") {
-  const hay = (types.join(" ") + " " + desc).toLowerCase();
-  return /thesis|dissertation|doctoral|masters|phd|m\.sc|m\s?thesis|dphil/.test(hay);
-}
-
-function bestLink(identifiers = []) {
-  const http = identifiers.find((i) => i.startsWith("http"));
-  if (http) return http;
-  const handle = identifiers.find((i) => i.includes("hdl.handle.net"));
-  if (handle) return "https://" + handle.replace(/^https?:\/\//, "");
-  const doi = identifiers.find((i) => /^10\./.test(i));
-  if (doi) return `https://doi.org/${doi}`;
-  return "";
-}
-
-// ===== Fetch Logo File =====
-async function loadLogos() {
+// Health check (Identify)
+async function checkIdentify(oaiBase) {
   try {
-    const res = await fetch("logos.json");
-    LOGOS = await res.json();
-  } catch (e) {
-    console.error("⚠️ Unable to load logos.json", e);
+    const url = `${oaiBase}?verb=Identify`;
+    const res = await fetch(PROXY + encodeURIComponent(url), { method: "GET" });
+    if (!res.ok) return false;
+    const xmlText = await res.text();
+    return /<Identify/i.test(xmlText);
+  } catch {
+    return false;
   }
 }
 
-// ====== Repository Fetch ======
-async function fetchInstitution(inst) {
-  const url = inst.url;
+// Harvest first page (ListRecords oai_dc)
+async function harvestFirstPage(source, typeFilter) {
+  const out = [];
   try {
+    const url = `${source.oai}?verb=ListRecords&metadataPrefix=oai_dc`;
     const res = await fetch(PROXY + encodeURIComponent(url));
+    if (!res.ok) return out;
     const text = await res.text();
     const xml = new DOMParser().parseFromString(text, "text/xml");
-
-    const records = Array.from(xml.getElementsByTagNameNS("*", "record"));
-    if (!records.length) throw new Error("No records returned");
-
-    const items = records.map((r) => {
+    const recs = Array.from(xml.getElementsByTagNameNS("*", "record"));
+    recs.forEach(r => {
       const md = r.getElementsByTagNameNS("*", "metadata")[0];
-      if (!md) return null;
-
+      if (!md) return;
       const titles = pick(md, "title");
       const creators = pick(md, "creator");
       const descs = pick(md, "description");
@@ -84,81 +153,162 @@ async function fetchInstitution(inst) {
       const dates = pick(md, "date");
       const ids = pick(md, "identifier");
 
+      const title = titles[0] || "(Untitled)";
       const description = descs[0] || "";
-      if (!isThesisLike(types, description)) return null;
+      const joinTypes = types.join(" ").toLowerCase();
 
-      return {
-        title: titles[0] || "(Untitled)",
+      let looksLike = /thesis|dissertation|doctoral|masters|phd|m\.?sc|m\s?thesis|dphil/.test(
+        (types.join(" ") + " " + description).toLowerCase()
+      );
+      if (typeFilter === "thesis") looksLike = looksLike && /thesis|masters|m\.?sc|m\s?thesis/.test(joinTypes);
+      if (typeFilter === "dissertation") looksLike = looksLike && /dissertation|phd|doctoral|dphil/.test(joinTypes);
+      if (!looksLike && typeFilter) return; // stricter if user selected a type
+
+      // best link
+      const http = ids.find(i => /^https?:\/\//i.test(i)) || ids.find(i => /hdl\.handle\.net/i.test(i));
+      const doi = ids.find(i => /^10\./.test(i));
+      const link = http || (doi ? `https://doi.org/${doi}` : "");
+
+      out.push({
+        title,
         creators,
         description,
         subjects,
         types,
         date: dates[0] || "",
-        link: bestLink(ids),
-        institution: inst.name,
-        country: inst.country
-      };
-    }).filter(Boolean);
-
-    console.log(`✅ ${inst.name}: ${items.length} theses`);
-    return { items, online: true };
-  } catch (e) {
-    console.warn(`⚠️ ${inst.name} repository seems offline or blocked`);
-    return { items: [], online: false };
+        link,
+        institution: source.name,
+        country: source.country
+      });
+    });
+  } catch {
+    // ignore
   }
+  return out;
 }
 
-// ===== Spinner =====
-function fadeOutSpinner() {
-  const spinner = document.getElementById("loadingSpinner");
-  if (spinner) spinner.classList.add("fade-out");
-  setTimeout(() => spinner?.remove(), 700);
-}
-
-// ===== Filters & Events =====
-function buildFilters() {
-  const instSelect = document.getElementById("institutionFilter");
-  instSelect.innerHTML = `<option value="">All</option>` + DSPACE_ENDPOINTS.map(i => `<option value="${i.name}">${i.name}</option>`).join("");
-  instSelect.addEventListener("change", (e) => {
-    const val = e.target.value;
-    SELECTED_INSTITUTIONS = val ? new Set([val]) : new Set();
-    CURRENT_PAGE = 1;
-    render();
-  });
-
-  const typeSel = document.getElementById("typeFilter");
-  typeSel.addEventListener("change", (e) => {
-    TYPE_FILTER = e.target.value;
-    CURRENT_PAGE = 1;
-    render();
-  });
-
-  const searchBox = document.getElementById("searchInput");
-  searchBox.addEventListener("input", (e) => {
-    SEARCH_TEXT = e.target.value.toLowerCase();
-    CURRENT_PAGE = 1;
-    render();
-  });
-  searchBox.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") render();
-  });
-
-  const yearBox = document.getElementById("yearFilter");
-  yearBox.addEventListener("input", (e) => {
-    YEAR_FILTER = e.target.value;
-    CURRENT_PAGE = 1;
-    render();
+// Build dropdown & cards
+function populateInstitutionFilter() {
+  const sel = document.getElementById("institutionFilter");
+  sel.innerHTML = "";
+  SOURCES.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.name; opt.textContent = s.name;
+    sel.appendChild(opt);
   });
 }
 
-// ===== Search & Filter Logic =====
+function logoFor(name) {
+  const src = LOGOS[name] || LOGOS._default || "";
+  return src;
+}
+
+function drawInstCards() {
+  const mount = document.getElementById("instCards");
+  mount.innerHTML = "";
+  SOURCES.forEach(src => {
+    const card = document.createElement("div");
+    card.className = "inst-card";
+    const logo = document.createElement("img");
+    logo.className = "inst-logo";
+    logo.src = logoFor(src.name);
+    logo.alt = `${src.name} logo`;
+    logo.onerror = () => { logo.src = LOGOS._default; };
+
+    const meta = document.createElement("div");
+    meta.className = "inst-meta";
+    const h = document.createElement("h3");
+    h.className = "inst-name"; h.textContent = src.name;
+    const p = document.createElement("p");
+    p.className = "inst-country"; p.textContent = src.country;
+
+    const badge = document.createElement("span");
+    badge.className = "badge"; badge.textContent = "Checking…";
+
+    meta.appendChild(h); meta.appendChild(p);
+    card.appendChild(logo); card.appendChild(meta); card.appendChild(badge);
+    mount.appendChild(card);
+
+    if (src.type === "dspace" && src.oai) {
+      // status check async
+      checkIdentify(src.oai).then(ok => {
+        badge.textContent = ok ? "Online" : "Offline";
+        card.classList.toggle("offline", !ok);
+        const cache = CACHE.get(src.name) || {};
+        CACHE.set(src.name, { ...cache, online: ok, checked: true });
+      }).catch(() => {
+        badge.textContent = "Offline";
+        card.classList.add("offline");
+        const cache = CACHE.get(src.name) || {};
+        CACHE.set(src.name, { ...cache, online: false, checked: true });
+      });
+    } else {
+      badge.textContent = "External";
+      card.classList.add("offline");
+      const cache = CACHE.get(src.name) || {};
+      CACHE.set(src.name, { ...cache, online: false, checked: true });
+    }
+
+    // click to select + fetch if needed
+    card.addEventListener("click", async () => {
+      toggleInstitutionSelection(src.name);
+      await ensureHarvestSelected();
+      render();
+      document.getElementById("results").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+}
+
+// Selection logic
+function toggleInstitutionSelection(name) {
+  if (SELECTED_INSTITUTIONS.has(name)) SELECTED_INSTITUTIONS.delete(name);
+  else SELECTED_INSTITUTIONS.add(name);
+
+  // reflect in <select multiple>
+  const sel = document.getElementById("institutionFilter");
+  Array.from(sel.options).forEach(o => {
+    if (SELECTED_INSTITUTIONS.size === 0) {
+      o.selected = false;
+    } else {
+      o.selected = SELECTED_INSTITUTIONS.has(o.value);
+    }
+  });
+}
+
+// Prefetch logic
+async function ensureHarvestSelected() {
+  const typeFilter = (document.getElementById("typeFilter").value || "").toLowerCase();
+  const toHarvest = SOURCES.filter(s =>
+    (SELECTED_INSTITUTIONS.size === 0 || SELECTED_INSTITUTIONS.has(s.name)) &&
+    s.type === "dspace" && s.oai
+  );
+
+  for (const src of toHarvest) {
+    const cache = CACHE.get(src.name) || {};
+    if (cache.items) continue; // already harvested
+    // Only harvest if online
+    if (cache.checked && cache.online === false) continue;
+
+    const items = await harvestFirstPage(src, typeFilter);
+    CACHE.set(src.name, { ...cache, items });
+  }
+
+  // merge unified pool of selected only
+  ALL_RECORDS = [];
+  CACHE.forEach((v, k) => {
+    if (SELECTED_INSTITUTIONS.size === 0 || SELECTED_INSTITUTIONS.has(k)) {
+      if (v.items && v.items.length) ALL_RECORDS.push(...v.items);
+    }
+  });
+}
+
+// Filtering + render
 function filteredItems() {
-  let pool = [];
-  INST_CACHE.forEach((items, name) => {
-    if (!SELECTED_INSTITUTIONS.size || SELECTED_INSTITUTIONS.has(name)) pool.push(...items);
-  });
+  const text = (SEARCH_TEXT || "").toLowerCase();
+  const year = (text.match(/\b(19|20)\d{2}\b/) || [])[0] || "";
+  const typeFilter = (document.getElementById("typeFilter").value || "").toLowerCase();
 
-  return pool.filter(it => {
+  return ALL_RECORDS.filter(it => {
     const t = (it.title || "").toLowerCase();
     const d = (it.description || "").toLowerCase();
     const a = (it.creators || []).join(" ").toLowerCase();
@@ -166,18 +316,20 @@ function filteredItems() {
     const inst = (it.institution || "").toLowerCase();
     const y = (it.date || "").substring(0, 4);
 
-    const textOK = !SEARCH_TEXT || t.includes(SEARCH_TEXT) || d.includes(SEARCH_TEXT) || a.includes(SEARCH_TEXT) || s.includes(SEARCH_TEXT) || inst.includes(SEARCH_TEXT);
-    const typeOK = TYPE_FILTER === "All" || (it.types.join(" ").toLowerCase().includes(TYPE_FILTER.toLowerCase()));
-    const yearOK = !YEAR_FILTER || y === YEAR_FILTER;
-    return textOK && typeOK && yearOK;
+    const textOK = !text || t.includes(text) || d.includes(text) || a.includes(text) || s.includes(text) || inst.includes(text);
+    const yearOK = !year || y === year;
+
+    let typeOK = true;
+    if (typeFilter === "thesis") typeOK = /thesis|masters|m\.?sc|m\s?thesis/.test((it.types || []).join(" ").toLowerCase());
+    if (typeFilter === "dissertation") typeOK = /dissertation|phd|doctoral|dphil/.test((it.types || []).join(" ").toLowerCase());
+
+    return textOK && yearOK && typeOK;
   });
 }
 
-// ===== Render Cards =====
 function render() {
-  const results = document.getElementById("results");
-  results.innerHTML = "";
-
+  const mount = document.getElementById("results");
+  mount.innerHTML = "";
   const items = filteredItems();
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   CURRENT_PAGE = Math.min(CURRENT_PAGE, totalPages);
@@ -185,72 +337,132 @@ function render() {
   const pageItems = items.slice(start, start + PAGE_SIZE);
 
   if (!pageItems.length) {
-    results.innerHTML = `<div class="loading">No results found.</div>`;
+    const div = document.createElement("div");
+    div.className = "loading";
+    div.textContent = SELECTED_INSTITUTIONS.size ? "No results found." : "Select one or more institutions above to view records.";
+    mount.appendChild(div);
   } else {
     pageItems.forEach(it => {
       const card = document.createElement("div");
       card.className = "card";
-      const subjBadges = (it.subjects || []).slice(0, 5).map(s => `<span class="badge">${s}</span>`).join(" ");
+      const badges = (it.subjects || []).slice(0, 6).map(s => `<span class="badge">${s}</span>`).join(" ");
       card.innerHTML = `
-        <div class="source-tag">DSpace • ${it.institution}</div>
+        <div class="badge">DSpace • ${it.institution}</div>
         <h3>${it.title}</h3>
         <div class="meta">
           ${it.creators?.length ? `<strong>Authors:</strong> ${it.creators.join(", ")}` : ""}
-          ${it.date ? ` • <strong>Year:</strong> ${it.date.substring(0, 4)}` : ""}
+          ${it.date ? ` • <strong>Year:</strong> ${it.date.substring(0,4)}` : ""}
           ${it.types?.length ? ` • <strong>Type:</strong> ${it.types[0]}` : ""}
         </div>
-        <p>${(it.description || "").slice(0, 250)}${(it.description || "").length > 250 ? "…" : ""}</p>
-        ${subjBadges ? `<div class="badges">${subjBadges}</div>` : ""}
+        <p>${(it.description || "").slice(0, 260)}${(it.description || "").length > 260 ? "…" : ""}</p>
+        ${badges ? `<div style="margin-top:.4rem">${badges}</div>` : ""}
         ${it.link ? `<p><a href="${it.link}" target="_blank" rel="noopener">View Record ↗</a></p>` : ""}
       `;
-      results.appendChild(card);
+      mount.appendChild(card);
     });
   }
 
-  fadeOutSpinner();
-}
-
-// ===== Institution Grid =====
-async function renderInstitutions() {
-  const grid = document.getElementById("institutionGrid");
-  grid.innerHTML = "";
-  for (const inst of DSPACE_ENDPOINTS) {
-    const div = document.createElement("div");
-    div.className = "inst-card";
-    const logo = LOGOS[inst.name] || LOGOS._default;
-    div.innerHTML = `
-      <img src="${logo}" alt="${inst.name} logo" class="inst-logo">
-      <h4>${inst.name}</h4>
-      <p>${inst.country}</p>
-      <span class="status" id="status-${inst.name.replace(/\W+/g, '')}">Checking…</span>
-    `;
-    div.addEventListener("click", () => {
-      SELECTED_INSTITUTIONS = new Set([inst.name]);
-      render();
-    });
-    grid.appendChild(div);
-
-    // Check repository status
-    fetchInstitution(inst).then(({ items, online }) => {
-      const statusEl = document.getElementById(`status-${inst.name.replace(/\W+/g, '')}`);
-      if (online) {
-        statusEl.textContent = "Online";
-        statusEl.classList.add("online");
-        INST_CACHE.set(inst.name, items);
-      } else {
-        statusEl.textContent = "Offline";
-        statusEl.classList.add("offline");
-      }
-    });
-    await delay(150);
+  const pagination = document.getElementById("pagination");
+  const info = document.getElementById("pageInfo");
+  if (items.length <= PAGE_SIZE) {
+    pagination.classList.add("hidden");
+  } else {
+    pagination.classList.remove("hidden");
+    info.textContent = `Page ${CURRENT_PAGE} of ${totalPages}`;
+    document.getElementById("prevPage").disabled = CURRENT_PAGE <= 1;
+    document.getElementById("nextPage").disabled = CURRENT_PAGE >= totalPages;
   }
 }
 
-// ===== Main Load =====
+// “Found in another repo” hint (exact title matches)
+function crossRepoHintIfNeeded() {
+  const q = (SEARCH_TEXT || "").trim();
+  if (!q || q.length < 6) return;
+  const lower = q.toLowerCase();
+  const matches = [];
+  CACHE.forEach((v, k) => {
+    (v.items || []).forEach(it => {
+      if ((it.title || "").toLowerCase() === lower) matches.push({ repo: k, title: it.title });
+    });
+  });
+  if (matches.length) {
+    const repos = Array.from(new Set(matches.map(m => m.repo)));
+    if (SELECTED_INSTITUTIONS.size && !repos.some(r => SELECTED_INSTITUTIONS.has(r))) {
+      alert(`This title was found in: ${repos.join(", ")}.\nYour current selection does not include that repository.`);
+    }
+  }
+}
+
+// Events
+function bindControls() {
+  document.getElementById("pageSizeSelect").addEventListener("change", e => {
+    PAGE_SIZE = parseInt(e.target.value, 10) || PAGE_SIZE_DEFAULT;
+    CURRENT_PAGE = 1; render();
+  });
+
+  document.getElementById("typeFilter").addEventListener("change", async () => {
+    // reharvest selected with the type filter applied
+    // clear cached items to force re-filter from source page
+    Array.from(SELECTED_INSTITUTIONS).forEach(name => {
+      const c = CACHE.get(name);
+      if (c) c.items = null;
+    });
+    await ensureHarvestSelected();
+    CURRENT_PAGE = 1; render();
+  });
+
+  const sel = document.getElementById("institutionFilter");
+  sel.addEventListener("change", async () => {
+    SELECTED_INSTITUTIONS = new Set(Array.from(sel.selectedOptions).map(o => o.value));
+    await ensureHarvestSelected();
+    CURRENT_PAGE = 1; render();
+  });
+
+  const searchBox = document.getElementById("searchInput");
+  searchBox.addEventListener("input", async e => {
+    SEARCH_TEXT = e.target.value;
+    CURRENT_PAGE = 1; render();
+    crossRepoHintIfNeeded();
+  });
+  searchBox.addEventListener("keypress", e => {
+    if (e.key === "Enter") { SEARCH_TEXT = e.target.value; CURRENT_PAGE = 1; render(); crossRepoHintIfNeeded(); }
+  });
+
+  document.getElementById("prevPage").addEventListener("click", () => {
+    if (CURRENT_PAGE > 1) { CURRENT_PAGE--; render(); }
+  });
+  document.getElementById("nextPage").addEventListener("click", () => {
+    CURRENT_PAGE++; render();
+  });
+}
+
+// Main
 async function load() {
-  await loadLogos();
-  buildFilters();
-  renderInstitutions();
+  initHeroBg();
+
+  try {
+    const logosRes = await fetch("logos.json");
+    LOGOS = await logosRes.json();
+  } catch { LOGOS = { _default: "https://upload.wikimedia.org/wikipedia/commons/1/15/SA_Open_Access_Logo.png" }; }
+
+  populateInstitutionFilter();
+  drawInstCards();
+  bindControls();
+
+  document.getElementById("loadingSpinner")?.remove();
+
+  // Precheck online status quietly; harvest only after selection
+  for (const src of SOURCES) {
+    if (src.type === "dspace" && src.oai) {
+      if (!CACHE.has(src.name)) CACHE.set(src.name, {});
+      // Identify already performed on card mount
+      await delay(80);
+    } else {
+      if (!CACHE.has(src.name)) CACHE.set(src.name, {});
+    }
+  }
+
+  render();
 }
 
 document.addEventListener("DOMContentLoaded", load);
