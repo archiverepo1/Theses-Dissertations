@@ -7,23 +7,19 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- HERO -->
   <header class="hero">
-    <canvas id="heroBg"></canvas>
+    <canvas id="heroBg" aria-hidden="true"></canvas>
     <div class="hero-text">
       <h1>National Theses & Dissertations Portal (South Africa)</h1>
       <p>Discover theses & dissertations harvested live from South African DSpace repositories (OAI-PMH).</p>
     </div>
   </header>
 
+  <!-- CONTROLS -->
   <section class="controls">
-    <label>Institution:
-      <select id="instSelect">
-        <option value="">All</option>
-      </select>
-    </label>
-
     <label>Type:
-      <select id="typeSelect">
+      <select id="typeSelect" aria-label="Type">
         <option value="">All</option>
         <option value="thesis">Thesis</option>
         <option value="dissertation">Dissertation</option>
@@ -31,31 +27,36 @@
     </label>
 
     <label>Page Size:
-      <select id="pageSize">
+      <select id="pageSizeSelect" aria-label="Page Size">
         <option value="50">50</option>
         <option value="100" selected>100</option>
       </select>
     </label>
 
-    <label>Search:
-      <input id="searchBox" type="text" placeholder="Search title, authors, abstract • add year like 2021" />
+    <label>Search/Year:
+      <input id="searchInput" type="text" placeholder="Search title, authors, abstract… (add a 4-digit year to filter)" />
     </label>
+    <button id="searchBtn" class="btn">Search All</button>
 
     <span class="note">Live OAI-PMH harvest • DSpace</span>
   </section>
 
-  <section class="cards" id="repoGrid"></section>
+  <!-- UNIVERSITY LOGO GRID -->
+  <section class="inst-grid" id="instGrid" aria-label="Institutions"></section>
 
+  <!-- RESULTS -->
   <main id="results" class="results"></main>
 
-  <div id="pagination" class="pagination hidden">
+  <!-- PAGINATION -->
+  <div id="pagination" class="pagination hidden" role="navigation" aria-label="Pagination">
     <button id="prevPage">⟨ Prev</button>
     <span id="pageInfo">Page 1 of 1</span>
     <button id="nextPage">Next ⟩</button>
   </div>
 
+  <!-- FOOTER -->
   <footer class="footer">
-    <p>© 2025 Theses-Dissertations • DSpace OAI-PMH Harvester</p>
+    <p>© 2025 InquiryBase • DSpace OAI-PMH Harvester • Served via Cloudflare Worker</p>
     <p>Developed by Vuyo Ngayeka</p>
   </footer>
 
